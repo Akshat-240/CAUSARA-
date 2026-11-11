@@ -17,7 +17,7 @@ describe('Causara Application Shell', () => {
     });
 
     render(<App />);
-    expect(screen.getByText(/Caus/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Caus/i)[0]).toBeInTheDocument();
     expect(
       screen.getByText(/Explainable Order Delay Intelligence & Intervention Analysis Platform/i)
     ).toBeInTheDocument();

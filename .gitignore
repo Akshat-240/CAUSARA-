@@ -12,6 +12,7 @@ htmlcov/
 junit.xml
 
 # Node / Frontend
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
@@ -22,10 +23,38 @@ yarn-error.log*
 
 # Environment & Secrets
 .env
+.env.*
 .env.local
 .env.*.local
+frontend/.env
+frontend/.env.*
+frontend/.env.local
+frontend/.env.*.local
 *.pem
 *.key
+!.env.example
+!frontend/.env.example
+
+# Local Database Files (LocalDB / SQLite)
+*.mdf
+*.ldf
+*.db
+*.sqlite3
+
+# Local Evidence Storage & Private Uploads
+storage/
+uploads/
+
+# Logs & Temporary Files
+*.log
+logs/
+
+# IDE & Editor Temporary State
+.idea/
+.vscode/*
+!.vscode/settings.json
+*.swp
+*.swo
 
 # Operating System
 .DS_Store
