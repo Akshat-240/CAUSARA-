@@ -94,7 +94,10 @@
 | `GET` | `/orders/{id}` | Retrieve order details | Authorized Owner |
 | `PATCH` | `/orders/{id}` | Update order attributes (e.g., expected delivery) | Seller, Manager |
 | `GET` | `/orders/{id}/timeline` | Retrieve chronological normalized events & customer summary | Customer, Seller, Manager |
+| `POST` | `/orders/{id}/timeline/reconstruct` | Trigger sync or async factual timeline reconstruction | Seller, Manager |
 | `GET` | `/orders/{id}/stages` | Retrieve planned vs. actual stage records | Seller, Manager |
+| `GET` | `/orders/stats` | Retrieve aggregated operational fulfillment metrics | All |
+| `GET` | `/sellers` | Retrieve list of registered sellers | All |
 
 #### `GET /orders/{id}/timeline` Response Contract
 ```json
@@ -182,6 +185,7 @@
 | `GET` | `/cases/{id}/delay-graph` | Fetch graph edges with epistemological tags | Seller, Manager, Analyst |
 | `POST` | `/cases/{id}/analysis-jobs` | Trigger asynchronous re-analysis | Seller, Manager |
 | `GET` | `/analysis-jobs/{id}` | Check status of background analysis job | Authorized Owner |
+| `GET` | `/orders/{id}/analysis-jobs` | List analysis jobs for an order | Authorized Owner |
 
 #### `GET /analysis-jobs/{id}` Response
 ```json
@@ -308,9 +312,11 @@ sequenceDiagram
 
 | Method | Endpoint | Description |
 |---|---|---|
+| `POST` | `/orders/{id}/evidence` | Register evidence via JSON metadata or direct multipart file upload |
+| `GET` | `/orders/{id}/evidence` | List all evidence items registered for an order (with stage/case filters) |
+| `GET` | `/evidence/{id}` | Fetch evidence metadata and file verification state |
 | `POST` | `/orders/{id}/evidence/upload-requests` | Request short-lived SAS upload URL (creates `PENDING_UPLOAD` record) |
 | `POST` | `/evidence/{id}/complete` | Confirm successful upload and transition status to `ACTIVE` |
-| `GET` | `/evidence/{id}` | Fetch evidence metadata and verification state |
 | `GET` | `/evidence/{id}/download-url` | Generate temporary read-only SAS download URL (active evidence only) |
 
 #### `POST /orders/{id}/evidence/upload-requests` Response
@@ -340,6 +346,45 @@ sequenceDiagram
 | `GET` | `/admin/users` | List platform users | Admin |
 | `PATCH` | `/admin/users/{id}/status` | Activate or suspend user account | Admin |
 | `POST` | `/admin/users/{id}/roles` | Assign or revoke user roles | Admin |
+
+---
+
+### 3.8 Identity & Operational Actors (`/users`, `/actors`)
+
+| Method | Endpoint | Description | Allowed Roles |
+|---|---|---|---|
+| `GET` | `/users` | List users with optional role filtering | All |
+| `GET` | `/actors` | List active operational actors for client-side demo attribution | All |
+
+```json
+// GET /api/v1/actors
+{
+  "success": true,
+  "data": {
+    "count": 4,
+    "actors": [
+      {
+        "id": 192173,
+        "name": "Marcus Vance",
+        "email": "demo_analyst@causara.com",
+        "role": "ANALYST",
+        "label": "Marcus Vance (Analyst)"
+      },
+      {
+        "id": 192174,
+        "name": "Elena Rostova",
+        "email": "demo_manager@causara.com",
+        "role": "MANAGER",
+        "label": "Elena Rostova (Manager)"
+      }
+    ]
+  },
+  "meta": {
+    "request_id": "req_84a1e948a",
+    "timestamp": "2026-11-10T12:00:00Z"
+  }
+}
+```
 
 ---
 
