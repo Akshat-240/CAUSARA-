@@ -21,12 +21,16 @@ class BaseConfig:
 
     JSON_SORT_KEYS: bool = False
 
+    # Internal operational API key for private maintenance and monitoring endpoints
+    INTERNAL_API_KEY: str = os.getenv("INTERNAL_API_KEY", "")
+
 
 class DevelopmentConfig(BaseConfig):
     """Configuration for local development."""
 
     DEBUG: bool = True
     ENV: str = "development"
+    INTERNAL_API_KEY: str = os.getenv("INTERNAL_API_KEY", "dev-internal-key")
 
 
 class TestingConfig(BaseConfig):
@@ -37,6 +41,7 @@ class TestingConfig(BaseConfig):
     ENV: str = "testing"
     CORS_ORIGINS: List[str] = ["*"]
     SECRET_KEY: str = "test-secret-key-for-automated-suites"
+    INTERNAL_API_KEY: str = os.getenv("INTERNAL_API_KEY", "test-internal-api-key")
 
 
 class ProductionConfig(BaseConfig):
