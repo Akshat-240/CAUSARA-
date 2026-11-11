@@ -121,7 +121,7 @@ class AzureBlobStorageProvider:
         if not blob_uri:
             return ""
         if blob_uri.startswith(f"azure://{self.container_name}/"):
-            return blob_uri[len(f"azure://{self.container_name}/") :]
+            return blob_uri[len(f"azure://{self.container_name}/"):]
         if blob_uri.startswith("azure://"):
             parts = blob_uri.replace("azure://", "").split("/", 1)
             return parts[1] if len(parts) > 1 else parts[0]
@@ -129,7 +129,7 @@ class AzureBlobStorageProvider:
             from urllib.parse import urlparse
             path = urlparse(blob_uri).path.lstrip("/")
             if path.startswith(f"{self.container_name}/"):
-                return path[len(self.container_name) + 1 :]
+                return path[len(self.container_name) + 1:]
             return path
         return blob_uri
 

@@ -395,8 +395,12 @@ def test_azure_blob_storage_provider_with_mock(monkeypatch):
         lambda conn_str: mock_service_client,
     )
 
+    conn_str = (
+        "DefaultEndpointsProtocol=https;AccountName=test;"
+        "AccountKey=key==;EndpointSuffix=core.windows.net"
+    )
     provider = AzureBlobStorageProvider(
-        connection_string="DefaultEndpointsProtocol=https;AccountName=test;AccountKey=key==;EndpointSuffix=core.windows.net",
+        connection_string=conn_str,
         container_name="evidence",
         create_container_if_missing=True,
     )
