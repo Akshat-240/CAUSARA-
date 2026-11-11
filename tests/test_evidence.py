@@ -336,3 +336,78 @@ def test_evidence_api_endpoints(client, seed_evidence_order):
     res_get = client.get(f"/api/v1/evidence/{evidence_id}")
     assert res_get.status_code == 200
     assert res_get.get_json()["data"]["file_name"] == "api_doc.pdf"
+
+
+def test_storage_provider_selection_local(monkeypatch):
+    """Verify get_default_storage_provider returns LocalStorageProvider by default."""
+    from app.services.evidence_service import get_default_storage_provider, LocalStorageProvider
+    monkeypatch.delenv("STORAGE_PROVIDER", raising=False)
+    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
+    monkeypatch.setenv("FLASK_ENV", "development")
+
+    provider = get_default_storage_provider()
+    assert isinstance(provider, LocalStorageProvider)
+
+
+def test_storage_provider_azure_missing_connection_string(monkeypatch):
+    """Verify get_default_storage_provider fails clearly if STORAGE_PROVIDER=azure but credentials missing."""
+    from app.services.evidence_service import get_default_storage_provider
+    monkeypatch.setenv("STORAGE_PROVIDER", "azure")
+    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
+
+    with pytest.raises(ValueError, match="AZURE_STORAGE_CONNECTION_STRING is missing or empty"):
+        get_default_storage_provider()
+
+
+def test_storage_provider_production_missing_azure_config(monkeypatch):
+    """Verify production fails clearly if Azure storage is not configured without explicit local override."""
+    from app.services.evidence_service import get_default_storage_provider
+    monkeypatch.delenv("STORAGE_PROVIDER", raising=False)
+    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
+    monkeypatch.setenv("FLASK_ENV", "production")
+
+    with pytest.raises(ValueError, match="Evidence storage must use Azure Blob Storage in production"):
+        get_default_storage_provider()
+
+
+def test_azure_blob_storage_provider_with_mock(monkeypatch):
+    """Verify AzureBlobStorageProvider store_file and read_file operations using mocked BlobServiceClient."""
+    from unittest.mock import MagicMock
+    from app.services.evidence_service import AzureBlobStorageProvider
+
+    mock_blob_client = MagicMock()
+    mock_blob_client.url = "https://causara.blob.core.windows.net/evidence/101/test_proof.pdf"
+    mock_blob_client.exists.return_value = True
+
+    mock_downloader = MagicMock()
+    mock_downloader.readall.return_value = b"Mock PDF blob content"
+    mock_blob_client.download_blob.return_value = mock_downloader
+
+    mock_container_client = MagicMock()
+    mock_container_client.exists.return_value = True
+    mock_container_client.get_blob_client.return_value = mock_blob_client
+
+    mock_service_client = MagicMock()
+    mock_service_client.get_container_client.return_value = mock_container_client
+
+    monkeypatch.setattr(
+        "azure.storage.blob.BlobServiceClient.from_connection_string",
+        lambda conn_str: mock_service_client,
+    )
+
+    provider = AzureBlobStorageProvider(
+        connection_string="DefaultEndpointsProtocol=https;AccountName=test;AccountKey=key==;EndpointSuffix=core.windows.net",
+        container_name="evidence",
+        create_container_if_missing=True,
+    )
+
+    # Test store_file
+    meta = provider.store_file(order_id=101, file_name="proof.pdf", file_bytes=b"Sample bytes")
+    assert meta["blob_uri"] == "https://causara.blob.core.windows.net/evidence/101/test_proof.pdf"
+    assert "sha256_hash" in meta
+    assert meta["size_bytes"] == len(b"Sample bytes")
+    assert mock_blob_client.upload_blob.called
+
+    # Test read_file
+    data = provider.read_file(meta["blob_uri"])
+    assert data == b"Mock PDF blob content"

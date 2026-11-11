@@ -2,7 +2,12 @@
 
 from app.services.event_service import EventService, IngestionResult
 from app.services.outbox_processor import OutboxProcessor, PermanentProcessingError
-from app.services.evidence_service import EvidenceService, LocalStorageProvider
+from app.services.evidence_service import (
+    AzureBlobStorageProvider,
+    EvidenceService,
+    LocalStorageProvider,
+    get_default_storage_provider,
+)
 from app.services.timeline_service import (
     ReconstructedStage,
     ReconstructedTimeline,
@@ -27,6 +32,8 @@ __all__ = [
     "PermanentProcessingError",
     "EvidenceService",
     "LocalStorageProvider",
+    "AzureBlobStorageProvider",
+    "get_default_storage_provider",
     "ReconstructedStage",
     "ReconstructedTimeline",
     "TimelineEvent",

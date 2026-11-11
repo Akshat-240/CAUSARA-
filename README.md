@@ -259,3 +259,117 @@ Set the connection parameters in `.env`:
 - **Cross-Order Referential Integrity**: Enforced through composite keys on child tables (`order_events`, `evidence`, `analysis_jobs`) and multi-row triggers on `delay_edges`.
 - **Parent Immutability**: Order ownership (`order_id`) on `order_stages` and `decision_cases` is permanently immutable; updates to parent `order_id` are rejected with errors `50012` and `50013`.
 - **Frontend Isolation**: The React frontend never connects directly to SQL Server; all database access is gated by the Flask REST API.
+
+---
+
+## 11. Simplified Azure Cloud Setup Guide
+
+Causara uses a simplified cloud deployment model where developers provision their own Azure resources through the Azure Portal and provide credentials via environment variables.
+
+### 11.1 Create Azure SQL Database
+
+1. Sign in to the [Azure Portal](https://portal.azure.com/).
+2. In the search bar, search for **SQL databases** and select **Create**.
+3. Configure resource group and database details:
+   - **Database name**: `causara-db`
+   - **Server**: Click **Create new**, specify a unique server name (e.g. `causara-sql`), select your region, and choose **Use SQL authentication**. Set a Server admin login (e.g. `causara-admin`) and a strong password.
+   - **Compute + storage**: Select **General Purpose - Serverless** (auto-pause enabled e.g. after 1 hour) or **Basic (5 DTU)** for a low-cost staging environment.
+4. **Configure Networking / Firewall**:
+   - Go to the SQL logical server's **Security** > **Networking** tab.
+   - Set **Public network access** to **Selected networks**.
+   - Check **Allow Azure services and resources to access this server** (enables Azure App Service connection).
+   - Under **Firewall rules**, click **Add your client IPv4 address** and click **Save** (enables running migrations from your workstation).
+5. **Obtain Connection String**:
+   - In your SQL Database, navigate to **Settings** > **Connection strings** > **ODBC**.
+   - Copy the connection string format:
+     ```text
+     Driver={ODBC Driver 18 for SQL Server};Server=tcp:<server-name>.database.windows.net,1433;Database=causara-db;Uid=causara-admin;Pwd={your_password_here};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;
+     ```
+   - Replace `{your_password_here}` with your actual password.
+
+### 11.2 Create Azure Blob Storage
+
+1. In the Azure Portal search bar, search for **Storage accounts** and click **Create**.
+2. Select your subscription and resource group, and choose a unique storage account name (e.g. `causarastorage`).
+3. Set **Performance** to **Standard** and **Redundancy** to **Locally-redundant storage (LRS)**.
+4. Click **Review + create**, then **Create**.
+5. **Create Evidence Container**:
+   - In the created storage account, navigate to **Data storage** > **Containers**.
+   - Click **+ Container**, name it `evidence`, set **Anonymous access level** to **Private (no anonymous access)**, and click **Create**.
+6. **Obtain Connection String**:
+   - In the storage account menu, navigate to **Security + networking** > **Access keys**.
+   - Click **Show keys** and copy the **Connection string** under `key1`.
+
+### 11.3 Configure `.env` for Azure
+
+Copy `.env.example` to `.env` in the project root:
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` with your Azure credentials:
+```ini
+# Flask Configuration
+FLASK_ENV=development
+SECRET_KEY=generate-a-strong-random-key-here
+PORT=5000
+
+# CORS Whitelist (include your frontend URLs)
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,https://<your-static-web-app>.azurestaticapps.net
+
+# Database: Azure SQL Database
+AZURE_SQL_CONNECTION_STRING=Driver={ODBC Driver 18 for SQL Server};Server=tcp:<your-server>.database.windows.net,1433;Database=causara-db;Uid=causara-admin;Pwd=YourSecurePassword!;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;
+DB_DRIVER=ODBC Driver 18 for SQL Server
+
+# Evidence Storage: Azure Blob Storage
+STORAGE_PROVIDER=azure
+AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=causarastorage;AccountKey=YourStorageAccountKey==;EndpointSuffix=core.windows.net
+AZURE_STORAGE_CONTAINER=evidence
+```
+
+> [!NOTE]
+> If `STORAGE_PROVIDER=azure` is configured, Causara verifies connectivity to Azure Blob Storage upon initialization. If credentials or network connectivity are missing, it fails immediately with a clear error and will never silently write files to local disk.
+
+### 11.4 Run Database Migrations against Azure SQL
+
+Once `.env` contains your `AZURE_SQL_CONNECTION_STRING`, run the migration runner:
+
+1. **Inspect migration status**:
+   ```powershell
+   .\.venv\Scripts\python.exe -m database.migration_runner status
+   ```
+
+2. **Execute forward migrations (`V001` through `V005`)**:
+   ```powershell
+   .\.venv\Scripts\python.exe -m database.migration_runner migrate
+   ```
+
+3. **Populate baseline demonstration data (Optional)**:
+   ```powershell
+   .\.venv\Scripts\python.exe -m database.seed_demo_data
+   ```
+
+### 11.5 Start Backend and Frontend
+
+1. **Start the Flask Backend**:
+   - In local development:
+     ```powershell
+     .\.venv\Scripts\python.exe run.py
+     ```
+   - In Linux / Production:
+     ```bash
+     gunicorn --bind=0.0.0.0:5000 --workers=4 --timeout=600 "run:app"
+     ```
+
+2. **Start the React Frontend**:
+   - In local development:
+     ```powershell
+     cd frontend
+     npm run dev
+     ```
+   - To build for Azure Static Web Apps:
+     ```powershell
+     cd frontend
+     $env:VITE_API_BASE_URL="https://<your-app-service-name>.azurewebsites.net/api/v1"
+     npm run build
+     ```

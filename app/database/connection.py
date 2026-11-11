@@ -10,14 +10,24 @@ logger = logging.getLogger(__name__)
 
 
 def build_connection_string() -> str:
-    """Build connection string from environment variables."""
-    conn_str = os.getenv("AZURE_SQL_CONNECTION_STRING") or os.getenv("DATABASE_URL")
+    """Build connection string from environment variables.
+
+    Supports:
+    1. Azure SQL Database via AZURE_SQL_CONNECTION_STRING or DATABASE_URL.
+       Automatically prepends the configured DB_DRIVER if the supplied connection string omits it.
+    2. SQL Server Authentication with explicit server, database, user, and password.
+    3. Local development via Windows Integrated / Trusted Connection (default: LocalDB).
+    """
+    conn_str = (os.getenv("AZURE_SQL_CONNECTION_STRING") or os.getenv("DATABASE_URL") or "").strip()
+    driver = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
+
     if conn_str:
+        if "DRIVER=" not in conn_str.upper():
+            return f"Driver={{{driver}}};{conn_str}"
         return conn_str
 
     server = os.getenv("DB_SERVER", r"(localdb)\CausaraDB")
     database = os.getenv("DB_NAME", "CausaraDB")
-    driver = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
     trusted = os.getenv("DB_TRUSTED_CONNECTION", "yes")
 
     if os.getenv("DB_USER") and os.getenv("DB_PASSWORD"):

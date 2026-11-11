@@ -32,7 +32,7 @@ DEFAULT_STORAGE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "
 class LocalStorageProvider:
     """Pluggable storage provider for local development.
 
-    Designed to be drop-in replaced by AzureBlobStorageProvider in production.
+    Stores evidence documents on the local filesystem under the configured root directory.
     """
 
     def __init__(self, root_dir: str = DEFAULT_STORAGE_ROOT) -> None:
@@ -73,6 +73,133 @@ class LocalStorageProvider:
         return None
 
 
+class AzureBlobStorageProvider:
+    """Pluggable storage provider for Azure Blob Storage.
+
+    Stores evidence documents in an Azure Blob Storage container with SHA-256 integrity verification.
+    """
+
+    def __init__(
+        self,
+        connection_string: Optional[str] = None,
+        container_name: Optional[str] = None,
+        create_container_if_missing: bool = True,
+    ) -> None:
+        conn_str = (connection_string or os.getenv("AZURE_STORAGE_CONNECTION_STRING") or "").strip()
+        if not conn_str:
+            raise ValueError(
+                "Azure Blob Storage configuration error: "
+                "AZURE_STORAGE_CONNECTION_STRING is missing or empty."
+            )
+        self.connection_string = conn_str
+        self.container_name = (
+            container_name or os.getenv("AZURE_STORAGE_CONTAINER") or "evidence"
+        ).strip()
+
+        try:
+            from azure.storage.blob import BlobServiceClient
+        except ImportError as ex:
+            raise RuntimeError(
+                "The 'azure-storage-blob' package is required for AzureBlobStorageProvider. "
+                "Please install it with 'pip install azure-storage-blob'."
+            ) from ex
+
+        try:
+            self.service_client = BlobServiceClient.from_connection_string(self.connection_string)
+            self.container_client = self.service_client.get_container_client(self.container_name)
+            if create_container_if_missing:
+                if not self.container_client.exists():
+                    self.container_client.create_container()
+        except Exception as ex:
+            logger.error("Failed to initialize Azure Blob Storage container '%s': %s", self.container_name, ex)
+            raise RuntimeError(
+                f"Failed to connect to Azure Blob Storage container '{self.container_name}': {ex}"
+            ) from ex
+
+    def _extract_blob_name(self, blob_uri: str) -> str:
+        """Extract container-relative blob name from URI or HTTPS URL."""
+        if not blob_uri:
+            return ""
+        if blob_uri.startswith(f"azure://{self.container_name}/"):
+            return blob_uri[len(f"azure://{self.container_name}/") :]
+        if blob_uri.startswith("azure://"):
+            parts = blob_uri.replace("azure://", "").split("/", 1)
+            return parts[1] if len(parts) > 1 else parts[0]
+        if "://" in blob_uri:
+            from urllib.parse import urlparse
+            path = urlparse(blob_uri).path.lstrip("/")
+            if path.startswith(f"{self.container_name}/"):
+                return path[len(self.container_name) + 1 :]
+            return path
+        return blob_uri
+
+    def store_file(self, order_id: int, file_name: str, file_bytes: bytes) -> Dict[str, Any]:
+        """Upload file bytes to Azure Blob Storage and return metadata."""
+        sha256 = hashlib.sha256(file_bytes).hexdigest()
+        safe_name = f"{sha256[:16]}_{os.path.basename(file_name)}"
+        blob_name = f"{order_id}/{safe_name}"
+
+        try:
+            blob_client = self.container_client.get_blob_client(blob_name)
+            blob_client.upload_blob(file_bytes, overwrite=True)
+            blob_uri = blob_client.url
+            return {
+                "blob_uri": blob_uri,
+                "sha256_hash": sha256,
+                "size_bytes": len(file_bytes),
+                "blob_name": blob_name,
+            }
+        except Exception as ex:
+            logger.error("Failed to upload evidence to Azure Blob Storage: %s", ex)
+            raise RuntimeError(f"Azure Blob Storage upload failed for order {order_id}: {ex}") from ex
+
+    def read_file(self, blob_uri: str) -> Optional[bytes]:
+        """Download bytes for a given Azure Blob Storage URI or URL."""
+        try:
+            blob_name = self._extract_blob_name(blob_uri)
+            if not blob_name:
+                return None
+            blob_client = self.container_client.get_blob_client(blob_name)
+            if not blob_client.exists():
+                return None
+            return blob_client.download_blob().readall()
+        except Exception as ex:
+            logger.warning("Failed to read blob from Azure Blob Storage '%s': %s", blob_uri, ex)
+            return None
+
+
+def get_default_storage_provider():
+    """Determine and instantiate the storage provider based on configuration.
+
+    Rules:
+    - If STORAGE_PROVIDER == "azure" or AZURE_STORAGE_CONNECTION_STRING is configured:
+      Initializes AzureBlobStorageProvider.
+      If credentials, package, or connectivity fail, RAISE immediately.
+      Never silently fall back to local storage.
+    - If FLASK_ENV == "production" and STORAGE_PROVIDER != "local":
+      If AZURE_STORAGE_CONNECTION_STRING is missing, raise ValueError.
+    - Otherwise (local development default):
+      Returns LocalStorageProvider.
+    """
+    provider_type = (os.getenv("STORAGE_PROVIDER") or "").strip().lower()
+    azure_conn_str = (os.getenv("AZURE_STORAGE_CONNECTION_STRING") or "").strip()
+    flask_env = (os.getenv("FLASK_ENV") or os.getenv("ENV") or "").strip().lower()
+
+    if provider_type == "azure" or azure_conn_str:
+        logger.info("Initializing AzureBlobStorageProvider for evidence attachments")
+        return AzureBlobStorageProvider()
+
+    if flask_env == "production" and provider_type != "local":
+        raise ValueError(
+            "Production configuration error: Evidence storage must use Azure Blob Storage in production. "
+            "Please configure AZURE_STORAGE_CONNECTION_STRING and AZURE_STORAGE_CONTAINER, "
+            "or set STORAGE_PROVIDER=local if intentionally testing local storage."
+        )
+
+    logger.info("Initializing LocalStorageProvider for evidence attachments")
+    return LocalStorageProvider()
+
+
 class EvidenceService:
     """Domain service for evidence registration, retrieval, and validation."""
 
@@ -80,11 +207,11 @@ class EvidenceService:
         self,
         repo: Optional[EvidenceRepository] = None,
         timeline_repo: Optional[TimelineRepository] = None,
-        storage: Optional[LocalStorageProvider] = None,
+        storage: Optional[Any] = None,
     ) -> None:
         self.repo = repo or EvidenceRepository()
         self.timeline_repo = timeline_repo or TimelineRepository()
-        self.storage = storage or LocalStorageProvider()
+        self.storage = storage or get_default_storage_provider()
 
     def register_evidence(
         self,
