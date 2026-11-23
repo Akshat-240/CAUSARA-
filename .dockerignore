@@ -1,0 +1,22 @@
+# Git and virtual environments
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Local environment and secrets (NEVER copy into image)
+.env
+.env.*
+!.env.example
+
+# Frontend development and dependencies
+frontend/node_modules
+frontend/dist
+.pytest_cache
+storage/evidence
+
+# Scratch scripts
+scratch/
