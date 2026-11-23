@@ -1,4 +1,5 @@
 import {
+  AuthUser,
   CandidateIntervention,
   CreateOrderPayload,
   DecisionScenario,
@@ -7,6 +8,7 @@ import {
   DemoActor,
   EvidenceItem,
   HealthData,
+  LoginPayload,
   OperationalDecision,
   Order,
   OrderListResponse,
@@ -14,6 +16,8 @@ import {
   OrderStats,
   OutcomeVerification,
   ReconstructedTimeline,
+  RegisterPayload,
+  RoleOption,
   Seller,
   User,
   ApiErrorResponse,
@@ -422,4 +426,38 @@ export async function fetchDecisionVerification(
     method: 'GET',
     signal,
   });
+}
+
+// ============================================================================
+// Authentication & Roles
+// ============================================================================
+
+export async function loginUser(
+  payload: LoginPayload,
+  signal?: AbortSignal
+): Promise<AuthUser> {
+  return request<AuthUser>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    signal,
+  });
+}
+
+export async function registerUser(
+  payload: RegisterPayload,
+  signal?: AbortSignal
+): Promise<AuthUser> {
+  return request<AuthUser>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    signal,
+  });
+}
+
+export async function fetchRoles(signal?: AbortSignal): Promise<RoleOption[]> {
+  const res = await request<{ roles: RoleOption[]; count: number }>('/auth/roles', {
+    method: 'GET',
+    signal,
+  });
+  return res.roles || [];
 }

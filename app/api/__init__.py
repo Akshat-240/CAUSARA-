@@ -11,6 +11,7 @@ from app.api.scenarios import scenarios_bp
 from app.api.decisions import decisions_bp
 from app.api.orders import orders_bp
 from app.api.users import users_bp
+from app.api.auth import auth_bp
 
 api_v1 = Blueprint("api_v1", __name__)
 
@@ -25,3 +26,4 @@ api_v1.register_blueprint(scenarios_bp)
 api_v1.register_blueprint(decisions_bp)
 api_v1.register_blueprint(orders_bp)
 api_v1.register_blueprint(users_bp)
+api_v1.register_blueprint(auth_bp)

@@ -1,5 +1,5 @@
 import React from 'react';
-import { HealthData, DemoActor } from '../../types/api';
+import { HealthData, DemoActor, AuthUser } from '../../types/api';
 
 interface HeaderProps {
   health: HealthData | null;
@@ -9,6 +9,8 @@ interface HeaderProps {
   actorsLoading?: boolean;
   activeActor: DemoActor | null;
   onActorChange: (actor: DemoActor) => void;
+  currentUser?: AuthUser | null;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,6 +21,8 @@ export const Header: React.FC<HeaderProps> = ({
   actorsLoading = false,
   activeActor,
   onActorChange,
+  currentUser,
+  onLogout,
 }) => {
   return (
     <header
@@ -172,6 +176,80 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </select>
         </div>
+
+        {/* Current Authenticated User Badge & Sign Out Button */}
+        {currentUser && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '4px 12px',
+              backgroundColor: '#f8fafc',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid #e2e8f0',
+              fontSize: '0.8rem',
+            }}
+          >
+            <div
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--primary)',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '0.75rem',
+              }}
+              title={currentUser.email}
+            >
+              {currentUser.full_name ? currentUser.full_name.charAt(0).toUpperCase() : 'U'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.2 }}>
+                {currentUser.full_name}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  color: 'var(--primary)',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {currentUser.role}
+                {currentUser.business_name ? ` • ${currentUser.business_name}` : ''}
+              </span>
+            </div>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                style={{
+                  marginLeft: '6px',
+                  padding: '4px 8px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: '#dc2626',
+                  backgroundColor: '#fee2e2',
+                  border: '1px solid #fecaca',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'background-color 0.15s ease',
+                }}
+                title="Sign out of Causara workspace"
+              >
+                Sign Out
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );

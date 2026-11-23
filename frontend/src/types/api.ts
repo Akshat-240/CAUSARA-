@@ -38,6 +38,37 @@ export type HealthResponse = ApiSuccessResponse<HealthData>;
 
 // --- User, Actor & Seller ---
 
+export interface AuthUser {
+  user_id: number;
+  full_name: string;
+  email: string;
+  role: 'SELLER' | 'CUSTOMER' | 'MANAGER' | 'ANALYST' | 'AUDITOR' | 'ADMIN' | string;
+  seller_id?: number | null;
+  business_name?: string | null;
+  token?: string;
+  message?: string;
+}
+
+export interface RoleOption {
+  role_id: number;
+  role_name: string;
+  description: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+  role?: string;
+}
+
+export interface RegisterPayload {
+  full_name: string;
+  email: string;
+  password: string;
+  role: string;
+  business_name?: string;
+}
+
 export interface DemoActor {
   id: number;
   name: string;

@@ -5,6 +5,10 @@ import logging
 import os
 from typing import Any, Generator, List, Optional, Tuple
 import pyodbc
+from dotenv import load_dotenv
+
+# Automatically load environment variables from .env if present
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +43,6 @@ def build_connection_string() -> str:
             f"Pwd={os.getenv('DB_PASSWORD')};"
             f"Encrypt=yes;"
             f"TrustServerCertificate=no;"
-            f"Connection Timeout=30;"
         )
 
     return f"Driver={{{driver}}};Server={server};Database={database};Trusted_Connection={trusted};"
@@ -54,7 +57,7 @@ def get_db_connection() -> Generator[pyodbc.Connection, None, None]:
     connection_string = build_connection_string()
     conn = None
     try:
-        conn = pyodbc.connect(connection_string, autocommit=False)
+        conn = pyodbc.connect(connection_string, autocommit=False, timeout=30)
         yield conn
         conn.commit()
     except Exception as ex:

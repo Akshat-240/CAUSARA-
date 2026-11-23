@@ -8,6 +8,10 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 import pyodbc
+from dotenv import load_dotenv
+
+# Automatically load environment variables from .env if present
+load_dotenv()
 
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
@@ -82,7 +86,7 @@ class MigrationRunner:
 
     def get_connection(self) -> pyodbc.Connection:
         """Create new connection with autocommit disabled for explicit transaction management."""
-        conn = pyodbc.connect(self.connection_string, autocommit=False)
+        conn = pyodbc.connect(self.connection_string, autocommit=False, timeout=30)
         return conn
 
     def ensure_migration_table(self, conn: pyodbc.Connection) -> None:

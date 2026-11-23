@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Layout } from './components/layout/Layout';
 import { NavigationTab } from './components/layout/Sidebar';
-import { DemoActor, HealthData } from './types/api';
+import { DemoActor, HealthData, AuthUser } from './types/api';
 import { fetchHealth, fetchActors } from './services/api';
+import { AuthPage } from './pages/AuthPage';
 
 // Pages
 import { OverviewPage } from './pages/OverviewPage';
@@ -25,6 +26,16 @@ interface NavigationParams {
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavigationTab>('overview');
   const [navParams, setNavParams] = useState<NavigationParams>({});
+
+  // User Authentication State
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    try {
+      const stored = localStorage.getItem('causara_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
 
   // Actors state dynamically loaded from backend database
   const [actors, setActors] = useState<DemoActor[]>([]);
@@ -72,6 +83,34 @@ export const App: React.FC = () => {
     checkConnectivity();
     loadActors();
   }, [checkConnectivity, loadActors]);
+
+  const handleAuthSuccess = (user: AuthUser) => {
+    try {
+      localStorage.setItem('causara_user', JSON.stringify(user));
+    } catch {
+      // ignore
+    }
+    setCurrentUser(user);
+    if (actors.length > 0) {
+      const matched = actors.find(
+        (a) =>
+          a.role.toUpperCase() === user.role.toUpperCase() ||
+          a.email.toLowerCase() === user.email.toLowerCase()
+      );
+      if (matched) {
+        setActiveActor(matched);
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('causara_user');
+    } catch {
+      // ignore
+    }
+    setCurrentUser(null);
+  };
 
   const handleNavigate = (
     tab: NavigationTab,
@@ -159,6 +198,17 @@ export const App: React.FC = () => {
     }
   };
 
+  if (!currentUser) {
+    return (
+      <AuthPage
+        onAuthSuccess={handleAuthSuccess}
+        health={health}
+        healthLoading={healthLoading}
+        healthError={healthError}
+      />
+    );
+  }
+
   return (
     <Layout
       activeTab={activeTab}
@@ -170,6 +220,8 @@ export const App: React.FC = () => {
       actorsLoading={actorsLoading}
       activeActor={activeActor}
       onActorChange={setActiveActor}
+      currentUser={currentUser}
+      onLogout={handleLogout}
     >
       {renderContent()}
     </Layout>

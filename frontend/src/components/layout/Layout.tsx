@@ -1,7 +1,7 @@
 import React from 'react';
 import { Header } from './Header';
 import { Sidebar, NavigationTab } from './Sidebar';
-import { HealthData, DemoActor } from '../../types/api';
+import { HealthData, DemoActor, AuthUser } from '../../types/api';
 import { Alert } from '../common/Alert';
 
 interface LayoutProps {
@@ -15,6 +15,8 @@ interface LayoutProps {
   actorsLoading?: boolean;
   activeActor: DemoActor | null;
   onActorChange: (actor: DemoActor) => void;
+  currentUser?: AuthUser | null;
+  onLogout?: () => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -28,6 +30,8 @@ export const Layout: React.FC<LayoutProps> = ({
   actorsLoading,
   activeActor,
   onActorChange,
+  currentUser,
+  onLogout,
 }) => {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
@@ -41,6 +45,8 @@ export const Layout: React.FC<LayoutProps> = ({
           actorsLoading={actorsLoading}
           activeActor={activeActor}
           onActorChange={onActorChange}
+          currentUser={currentUser}
+          onLogout={onLogout}
         />
         <main
           style={{
