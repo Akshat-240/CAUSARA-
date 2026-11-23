@@ -618,7 +618,7 @@ def seed_demo_data() -> None:
     logger.info("==================================================================")
     logger.info("Causara Demonstration Data Seeded Successfully!")
     logger.info(f"  1. Order ORD-DEMO-ONTIME-001 (ID: {ord1_id}) -> DELIVERED (On-Time)")
-    logger.info(f"  2. Order ORD-DEMO-WAREHOUSE-002 (ID: {ord2_id}) -> IN_TRANSIT (Case: {case2_id}, Dec: {dec2_id})")
+    logger.info(f"  2. Order ORD-DEMO-WAREHOUSE-002 (ID: {ord2_id}) -> PROCESSING (Case: {case2_id}, Dec: {dec2_id})")
     logger.info(f"  3. Order ORD-DEMO-TRANSPORT-003 (ID: {ord3_id}) -> DELIVERED (Verified, Dec: {dec3_id})")
     logger.info(f"  4. Order ORD-DEMO-CANCELLED-004 (ID: {ord4_id}) -> CANCELLED (Terminal Event)")
     logger.info("==================================================================")
