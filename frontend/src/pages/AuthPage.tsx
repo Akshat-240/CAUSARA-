@@ -3,6 +3,8 @@ import { AuthUser, HealthData } from '../types/api';
 import { loginUser, registerUser } from '../services/api';
 import { Alert } from '../components/common/Alert';
 import { Button } from '../components/common/Button';
+import { ThemeToggle } from '../components/common/ThemeToggle';
+import { useTheme } from '../context/ThemeContext';
 
 interface AuthPageProps {
   onAuthSuccess: (user: AuthUser) => void;
@@ -50,21 +52,21 @@ const ROLES: RoleCard[] = [
   {
     id: 'ANALYST',
     title: 'Supply Chain Analyst',
-    badge: 'Intelligence & Modeling',
-    description: 'Inspect synthesized delay propagation graphs and analyze mathematical intervention efficacy.',
+    badge: 'Causal Modelling',
+    description: 'Simulate scenario interventions, inspect causal graph DAGs, and analyze root cause probabilities.',
     iconSvg: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <line x1="18" y1="20" x2="18" y2="10" />
-        <line x1="12" y1="20" x2="12" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="14" />
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
       </svg>
     ),
   },
   {
     id: 'CUSTOMER',
-    title: 'Consumer / Buyer',
-    badge: 'Delivery Tracking',
-    description: 'Track consignments with plain-language explanations and real-time delivery milestones.',
+    title: 'Customer Service Representative',
+    badge: 'Client Resolution',
+    description: 'View customer-facing timeline updates, SLA status, and verified resolution explanations.',
     iconSvg: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -75,8 +77,8 @@ const ROLES: RoleCard[] = [
   {
     id: 'AUDITOR',
     title: 'Compliance Auditor',
-    badge: 'Integrity & Verification',
-    description: 'Inspect immutable system audit trails, cryptographic SHA-256 evidence, and error deltas.',
+    badge: 'Verification & History',
+    description: 'Verify cryptographic evidence hashes, review decision verification outcomes, and inspect outbox sync.',
     iconSvg: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -102,6 +104,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   healthLoading,
   healthError,
 }) => {
+  const { theme } = useTheme();
   const [mode, setMode] = useState<AuthMode>('login');
 
   // Form states
@@ -202,43 +205,45 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     <div
       style={{
         minHeight: '100vh',
-        backgroundColor: '#090d16',
-        backgroundImage: 'radial-gradient(circle at 50% 0%, #1e293b 0%, #090d16 80%)',
-        color: '#f8fafc',
+        backgroundColor: 'var(--bg-main)',
+        color: 'var(--text-main)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '32px 16px',
         fontFamily: 'var(--font-family)',
+        position: 'relative',
+        transition: 'background-color 0.2s ease, color 0.2s ease',
       }}
     >
+      {/* Top Bar with Theme Toggle */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '20px',
+          right: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+        }}
+      >
+        <ThemeToggle />
+      </div>
+
       {/* Branding Header */}
-      <div style={{ textAlign: 'center', marginBottom: '28px', maxWidth: '640px' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <span
-            style={{
-              display: 'inline-block',
-              width: '12px',
-              height: '12px',
-              borderRadius: '50%',
-              backgroundColor: '#3b82f6',
-              boxShadow: '0 0 12px #3b82f6',
-            }}
+      <div style={{ textAlign: 'center', marginBottom: '24px', maxWidth: '640px' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px' }}>
+          <img
+            src={theme === 'dark' ? '/assets/causara-logo-dark.svg' : '/assets/causara-logo-light.svg'}
+            alt="Causara"
+            style={{ height: '42px', width: 'auto', display: 'block' }}
           />
-          <h1
-            style={{
-              fontSize: '2rem',
-              fontWeight: 800,
-              letterSpacing: '-0.03em',
-              color: '#ffffff',
-              margin: 0,
-            }}
-          >
-            Caus<span style={{ color: '#3b82f6' }}>ara</span>
+          <h1 style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', border: 0 }}>
+            Causara
           </h1>
         </div>
-        <p style={{ fontSize: '0.9rem', color: '#94a3b8', margin: '4px 0 12px 0' }}>
+        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: '4px 0 12px 0' }}>
           Explainable Order Delay Intelligence & Intervention Analysis Platform
         </p>
 
@@ -251,10 +256,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               gap: '6px',
               fontSize: '0.75rem',
               padding: '3px 10px',
-              borderRadius: '9999px',
-              backgroundColor: healthLoading ? '#332701' : healthError ? '#450a0a' : '#052e16',
-              color: healthLoading ? '#fbbf24' : healthError ? '#f87171' : '#4ade80',
-              border: `1px solid ${healthLoading ? '#78350f' : healthError ? '#991b1b' : '#166534'}`,
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: healthLoading
+                ? 'var(--status-amber-bg)'
+                : healthError
+                ? 'var(--status-red-bg)'
+                : 'var(--status-green-bg)',
+              color: healthLoading
+                ? 'var(--status-amber)'
+                : healthError
+                ? 'var(--status-red)'
+                : 'var(--status-green)',
+              border: `1px solid ${
+                healthLoading
+                  ? 'var(--status-amber-border)'
+                  : healthError
+                  ? 'var(--status-red-border)'
+                  : 'var(--status-green-border)'
+              }`,
             }}
           >
             <span
@@ -270,14 +289,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               {healthLoading ? 'Checking...' : healthError ? 'Disconnected' : 'Operational'}
             </span>
             {health && (
-              <span style={{ color: '#94a3b8', marginLeft: '4px' }}>
+              <span style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>
                 {health.service}
               </span>
             )}
           </div>
         </div>
         {healthError && (
-          <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#f87171' }}>
+          <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--status-red)' }}>
             Connection Error: {healthError}
           </div>
         )}
@@ -288,19 +307,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         style={{
           width: '100%',
           maxWidth: '560px',
-          backgroundColor: '#0f172a',
-          border: '1px solid #1e293b',
-          borderRadius: '16px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+          backgroundColor: 'var(--bg-surface)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-lg)',
           overflow: 'hidden',
+          transition: 'background-color 0.2s ease, border-color 0.2s ease',
         }}
       >
         {/* Tab Switcher */}
         <div
           style={{
             display: 'flex',
-            borderBottom: '1px solid #1e293b',
-            backgroundColor: '#0b1120',
+            borderBottom: '1px solid var(--border-color)',
+            backgroundColor: 'var(--bg-surface-subtle)',
           }}
         >
           <button
@@ -314,10 +334,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               padding: '16px',
               fontSize: '0.95rem',
               fontWeight: 600,
-              color: mode === 'login' ? '#ffffff' : '#64748b',
-              backgroundColor: mode === 'login' ? '#0f172a' : 'transparent',
+              color: mode === 'login' ? 'var(--text-main)' : 'var(--text-muted)',
+              backgroundColor: mode === 'login' ? 'var(--bg-surface)' : 'transparent',
               border: 'none',
-              borderBottom: mode === 'login' ? '2px solid #3b82f6' : '2px solid transparent',
+              borderBottom: mode === 'login' ? '2px solid var(--primary)' : '2px solid transparent',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
             }}
@@ -335,10 +355,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               padding: '16px',
               fontSize: '0.95rem',
               fontWeight: 600,
-              color: mode === 'register' ? '#ffffff' : '#64748b',
-              backgroundColor: mode === 'register' ? '#0f172a' : 'transparent',
+              color: mode === 'register' ? 'var(--text-main)' : 'var(--text-muted)',
+              backgroundColor: mode === 'register' ? 'var(--bg-surface)' : 'transparent',
               border: 'none',
-              borderBottom: mode === 'register' ? '2px solid #3b82f6' : '2px solid transparent',
+              borderBottom: mode === 'register' ? '2px solid var(--primary)' : '2px solid transparent',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
             }}
@@ -366,18 +386,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               {/* Quick Demo Accounts Banner */}
               <div
                 style={{
-                  backgroundColor: '#1e293b50',
-                  border: '1px solid #334155',
-                  borderRadius: '10px',
+                  backgroundColor: 'var(--bg-surface-subtle)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
                   padding: '12px 14px',
                   marginBottom: '20px',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                     Quick Demo Presets (One-Click Testing)
                   </span>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Pass: demo123</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Pass: demo123</span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {DEMO_PRESETS.map((p) => (
@@ -389,15 +409,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         padding: '5px 10px',
                         fontSize: '0.75rem',
                         fontWeight: 500,
-                        backgroundColor: '#1e293b',
-                        color: '#e2e8f0',
-                        border: '1px solid #475569',
-                        borderRadius: '6px',
+                        backgroundColor: 'var(--bg-surface)',
+                        color: 'var(--text-main)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-sm)',
                         cursor: 'pointer',
-                        transition: 'background-color 0.1s',
+                        transition: 'background-color 0.15s ease',
                       }}
-                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
-                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-subtle)')}
+                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface)')}
                     >
                       {p.name} <span style={{ opacity: 0.6 }}>({p.role})</span>
                     </button>
@@ -409,7 +429,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <div style={{ marginBottom: '16px' }}>
                 <label
                   htmlFor="login-email"
-                  style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}
+                  style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-main)', marginBottom: '6px' }}
                 >
                   Email Address
                 </label>
@@ -424,10 +444,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     width: '100%',
                     padding: '10px 14px',
                     fontSize: '0.9rem',
-                    backgroundColor: '#1e293b',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#ffffff',
+                    backgroundColor: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-main)',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
@@ -437,7 +457,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               {/* Password Input */}
               <div style={{ marginBottom: '18px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label htmlFor="login-password" style={{ fontSize: '0.825rem', fontWeight: 500, color: '#cbd5e1' }}>
+                  <label htmlFor="login-password" style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-main)' }}>
                     Password
                   </label>
                   <button
@@ -447,7 +467,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       background: 'none',
                       border: 'none',
                       fontSize: '0.75rem',
-                      color: '#94a3b8',
+                      color: 'var(--primary)',
                       cursor: 'pointer',
                       padding: 0,
                     }}
@@ -466,10 +486,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     width: '100%',
                     padding: '10px 14px',
                     fontSize: '0.9rem',
-                    backgroundColor: '#1e293b',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#ffffff',
+                    backgroundColor: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-main)',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
@@ -478,7 +498,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
               {/* Operating Role Filter */}
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: '#cbd5e1', marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-main)', marginBottom: '8px' }}>
                   Active Workspace Role
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
@@ -494,12 +514,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           textAlign: 'center',
                           fontSize: '0.75rem',
                           fontWeight: 600,
-                          borderRadius: '6px',
-                          border: isSelected ? '1px solid #3b82f6' : '1px solid #334155',
-                          backgroundColor: isSelected ? '#1e3a8a50' : '#1e293b',
-                          color: isSelected ? '#60a5fa' : '#94a3b8',
+                          borderRadius: 'var(--radius-sm)',
+                          border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                          backgroundColor: isSelected ? 'var(--primary-subtle)' : 'var(--bg-surface)',
+                          color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
                           cursor: 'pointer',
-                          transition: 'all 0.1s',
+                          transition: 'all 0.15s ease',
                         }}
                       >
                         {role}
@@ -519,11 +539,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   padding: '12px',
                   fontSize: '0.95rem',
                   fontWeight: 600,
-                  backgroundColor: '#2563eb',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#ffffff',
-                  cursor: 'pointer',
                 }}
               >
                 Sign In to Causara Platform
@@ -538,7 +553,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <div style={{ marginBottom: '16px' }}>
                 <label
                   htmlFor="reg-name"
-                  style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}
+                  style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-main)', marginBottom: '6px' }}
                 >
                   Full Name
                 </label>
@@ -553,10 +568,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     width: '100%',
                     padding: '10px 14px',
                     fontSize: '0.9rem',
-                    backgroundColor: '#1e293b',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#ffffff',
+                    backgroundColor: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-main)',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
@@ -567,7 +582,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <div style={{ marginBottom: '16px' }}>
                 <label
                   htmlFor="reg-email"
-                  style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}
+                  style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-main)', marginBottom: '6px' }}
                 >
                   Work / Personal Email
                 </label>
@@ -582,10 +597,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     width: '100%',
                     padding: '10px 14px',
                     fontSize: '0.9rem',
-                    backgroundColor: '#1e293b',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                    color: '#ffffff',
+                    backgroundColor: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-main)',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
@@ -594,7 +609,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
               {/* Role Selection Cards */}
               <div style={{ marginBottom: '18px' }}>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: '#cbd5e1', marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-main)', marginBottom: '8px' }}>
                   Select Operational Role
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -609,16 +624,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                           alignItems: 'flex-start',
                           gap: '12px',
                           padding: '10px 12px',
-                          borderRadius: '8px',
-                          border: isSelected ? '1px solid #3b82f6' : '1px solid #334155',
-                          backgroundColor: isSelected ? '#1e3a8a30' : '#1e293b50',
+                          borderRadius: 'var(--radius-md)',
+                          border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                          backgroundColor: isSelected ? 'var(--primary-subtle)' : 'var(--bg-surface)',
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
                         }}
                       >
                         <div
                           style={{
-                            color: isSelected ? '#3b82f6' : '#94a3b8',
+                            color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
                             marginTop: '2px',
                           }}
                         >
@@ -626,7 +641,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isSelected ? '#ffffff' : '#e2e8f0' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isSelected ? 'var(--primary)' : 'var(--text-main)' }}>
                               {r.title}
                             </span>
                             <span
@@ -634,14 +649,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                                 fontSize: '0.675rem',
                                 padding: '2px 6px',
                                 borderRadius: '4px',
-                                backgroundColor: isSelected ? '#1e40af' : '#334155',
-                                color: isSelected ? '#bfdbfe' : '#94a3b8',
+                                backgroundColor: isSelected ? 'var(--primary)' : 'var(--bg-surface-subtle)',
+                                color: isSelected ? 'var(--text-inverse)' : 'var(--text-muted)',
+                                fontWeight: 600,
                               }}
                             >
                               {r.badge}
                             </span>
                           </div>
-                          <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '3px 0 0 0', lineHeight: 1.3 }}>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '3px 0 0 0', lineHeight: 1.3 }}>
                             {r.description}
                           </p>
                         </div>
@@ -656,7 +672,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <div style={{ marginBottom: '16px' }}>
                   <label
                     htmlFor="reg-business"
-                    style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}
+                    style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-main)', marginBottom: '6px' }}
                   >
                     Merchant / Logistics Business Name
                   </label>
@@ -670,10 +686,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       width: '100%',
                       padding: '10px 14px',
                       fontSize: '0.9rem',
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#ffffff',
+                      backgroundColor: 'var(--bg-surface)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--text-main)',
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
@@ -686,7 +702,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <div>
                   <label
                     htmlFor="reg-password"
-                    style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}
+                    style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-main)', marginBottom: '6px' }}
                   >
                     Password
                   </label>
@@ -701,10 +717,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       width: '100%',
                       padding: '10px 14px',
                       fontSize: '0.9rem',
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#ffffff',
+                      backgroundColor: 'var(--bg-surface)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--text-main)',
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
@@ -713,7 +729,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <div>
                   <label
                     htmlFor="reg-confirm-password"
-                    style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: '#cbd5e1', marginBottom: '6px' }}
+                    style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-main)', marginBottom: '6px' }}
                   >
                     Confirm Password
                   </label>
@@ -728,10 +744,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       width: '100%',
                       padding: '10px 14px',
                       fontSize: '0.9rem',
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#ffffff',
+                      backgroundColor: 'var(--bg-surface)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--text-main)',
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
@@ -749,11 +765,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   padding: '12px',
                   fontSize: '0.95rem',
                   fontWeight: 600,
-                  backgroundColor: '#2563eb',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#ffffff',
-                  cursor: 'pointer',
                 }}
               >
                 Create {selectedRole} Account & Open Workspace
@@ -766,13 +777,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         <div
           style={{
             padding: '14px 28px',
-            backgroundColor: '#090d16',
-            borderTop: '1px solid #1e293b',
+            backgroundColor: 'var(--bg-surface-subtle)',
+            borderTop: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             fontSize: '0.725rem',
-            color: '#64748b',
+            color: 'var(--text-muted)',
           }}
         >
           <span>Epistemological Integrity: Facts • Hypotheses • Estimates</span>
@@ -787,7 +798,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       </div>
 
       {/* Outer Footnote */}
-      <p style={{ marginTop: '24px', fontSize: '0.75rem', color: '#64748b' }}>
+      <p style={{ marginTop: '24px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
         Causara Order Intelligence &copy; 2026. All operational actions are recorded to immutable audit trails.
       </p>
     </div>

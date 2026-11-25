@@ -37,8 +37,8 @@ export const Modal: React.FC<ModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(2px)',
+        backgroundColor: 'rgba(33, 29, 26, 0.65)',
+        backdropFilter: 'blur(3px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -49,7 +49,7 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--bg-surface)',
           borderRadius: 'var(--radius-lg)',
           border: '1px solid var(--border-color)',
           boxShadow: 'var(--shadow-lg)',
@@ -91,6 +91,7 @@ export const Modal: React.FC<ModalProps> = ({
               cursor: 'pointer',
               padding: '4px 8px',
               borderRadius: 'var(--radius-sm)',
+              lineHeight: 1,
             }}
             aria-label="Close modal"
           >
@@ -98,14 +99,16 @@ export const Modal: React.FC<ModalProps> = ({
           </button>
         </div>
 
-        <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>{children}</div>
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, color: 'var(--text-main)' }}>
+          {children}
+        </div>
 
         {footer && (
           <div
             style={{
               padding: '12px 20px',
               borderTop: '1px solid var(--border-color)',
-              backgroundColor: '#f8fafc',
+              backgroundColor: 'var(--bg-surface-subtle)',
               display: 'flex',
               justifyContent: 'flex-end',
               gap: '12px',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Header } from './Header';
 import { Sidebar, NavigationTab } from './Sidebar';
 import { HealthData, DemoActor, AuthUser } from '../../types/api';
@@ -33,9 +33,24 @@ export const Layout: React.FC<LayoutProps> = ({
   currentUser,
   onLogout,
 }) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
-      <Sidebar activeTab={activeTab} onSelectTab={onSelectTab} />
+    <div
+      style={{
+        display: 'flex',
+        minHeight: '100vh',
+        backgroundColor: 'var(--bg-main)',
+        color: 'var(--text-main)',
+        transition: 'background-color 0.2s ease, color 0.2s ease',
+      }}
+    >
+      <Sidebar
+        activeTab={activeTab}
+        onSelectTab={onSelectTab}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
+      />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <Header
           health={health}
@@ -47,6 +62,7 @@ export const Layout: React.FC<LayoutProps> = ({
           onActorChange={onActorChange}
           currentUser={currentUser}
           onLogout={onLogout}
+          onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
         />
         <main
           style={{
@@ -55,7 +71,9 @@ export const Layout: React.FC<LayoutProps> = ({
             maxWidth: '1440px',
             width: '100%',
             margin: '0 auto',
+            boxSizing: 'border-box',
           }}
+          className="layout-main-content"
         >
           {healthError && (
             <div style={{ marginBottom: '24px' }}>

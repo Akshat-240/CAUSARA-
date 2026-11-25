@@ -1,70 +1,178 @@
-/* Causara Global Design System & Reset */
-:root {
-  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+/* Causara Global Design System 1.0 — Porcelain & Terracotta */
 
-  /* Sidebar Palette (Dark Navy / Charcoal) */
-  --sidebar-bg: #0f172a;
-  --sidebar-border: #1e293b;
-  --sidebar-text: #e2e8f0;
-  --sidebar-text-muted: #94a3b8;
-  --sidebar-active-bg: #1e293b;
-  --sidebar-active-text: #ffffff;
-  --sidebar-hover-bg: #1e293b80;
+:root,
+[data-theme="light"] {
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
-  /* Main Workspace Palette (Light & Crisp) */
-  --bg-main: #f8fafc;
-  --bg-card: #ffffff;
-  --border-color: #e2e8f0;
-  --border-subtle: #f1f5f9;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --text-light: #94a3b8;
+  /* Porcelain & Terracotta — Light Theme */
+  --bg-main: #F6F2ED;
+  --bg-surface: #FFFCF8;
+  --bg-surface-subtle: #EAE0D7;
+  --bg-surface-elevated: #FFFFFF;
+  --bg-card: #FFFCF8;
 
-  /* Accent Blue & Brand */
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-light: #eff6ff;
-  --primary-border: #bfdbfe;
+  /* Brand Accents */
+  --primary: #854F3D;
+  --primary-hover: #724232;
+  --primary-subtle: #F3EAE5;
+  --primary-border: #D8BDB1;
+  --primary-light: #F3EAE5;
 
-  /* Semantic Status Colors */
-  --status-green: #16a34a;
-  --status-green-bg: #f0fdf4;
-  --status-green-border: #bbf7d0;
+  --secondary: #B78D76;
+  --secondary-hover: #A07862;
+  --secondary-subtle: #F8F3EF;
 
-  --status-blue: #0284c7;
-  --status-blue-bg: #f0f9ff;
-  --status-blue-border: #bae6fd;
+  /* Typography */
+  --text-main: #342D29;
+  --text-muted: #897A70;
+  --text-light: #A8988D;
+  --text-inverse: #FFFFFF;
 
-  --status-amber: #d97706;
-  --status-amber-bg: #fffbeb;
-  --status-amber-border: #fde68a;
+  /* Borders & Dividers */
+  --border-color: #E3D8CE;
+  --border-subtle: #EFE8E1;
 
-  --status-red: #dc2626;
-  --status-red-bg: #fef2f2;
-  --status-red-border: #fecaca;
+  /* Sidebar Palette (Warm Charcoal / Terracotta-grounded) */
+  --sidebar-bg: #2B2521;
+  --sidebar-border: #3A322C;
+  --sidebar-text: #EAE0D7;
+  --sidebar-text-muted: #A8988D;
+  --sidebar-active-bg: #3F352E;
+  --sidebar-active-text: #FFFCF8;
+  --sidebar-hover-bg: rgba(234, 224, 215, 0.08);
 
-  --status-gray: #475569;
-  --status-gray-bg: #f8fafc;
-  --status-gray-border: #cbd5e1;
+  /* Header Palette */
+  --header-bg: #FFFCF8;
+  --header-border: #E3D8CE;
 
-  /* Layout Measurements */
-  --sidebar-width: 250px;
+  /* Semantic Status Colors (Independent of Brand Accent) */
+  --status-green: #2E7D32;
+  --status-green-bg: #EDF7ED;
+  --status-green-border: #C8E6C9;
+
+  --status-blue: #2B6CB0;
+  --status-blue-bg: #EBF8FF;
+  --status-blue-border: #BEE3F8;
+
+  --status-amber: #B45309;
+  --status-amber-bg: #FEF3C7;
+  --status-amber-border: #FDE68A;
+
+  --status-red: #C53030;
+  --status-red-bg: #FFEEEE;
+  --status-red-border: #FED7D7;
+
+  --status-gray: #64748B;
+  --status-gray-bg: #F1F5F9;
+  --status-gray-border: #CBD5E1;
+
+  --status-purple: #7E22CE;
+  --status-purple-bg: #FAF5FF;
+  --status-purple-border: #E9D5FF;
+
+  /* Layout Measurements (8px Grid Alignment) */
+  --sidebar-width: 256px;
   --header-height: 64px;
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  /* Shadows: Restrained & Subtle */
+  --shadow-sm: 0 1px 2px 0 rgba(52, 45, 41, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(52, 45, 41, 0.06), 0 2px 4px -2px rgba(52, 45, 41, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(52, 45, 41, 0.08), 0 4px 6px -4px rgba(52, 45, 41, 0.03);
+
+  /* Focus Ring */
+  --focus-ring: 0 0 0 3px rgba(133, 79, 61, 0.22);
+}
+
+[data-theme="dark"] {
+  /* Porcelain & Terracotta — Dark Theme */
+  --bg-main: #211D1A;
+  --bg-surface: #2B2521;
+  --bg-surface-subtle: #342D29;
+  --bg-surface-elevated: #3A322C;
+  --bg-card: #2B2521;
+
+  /* Brand Accents */
+  --primary: #D49A7F;
+  --primary-hover: #E0AB92;
+  --primary-subtle: #3C2F28;
+  --primary-border: #6B4E41;
+  --primary-light: #3C2F28;
+
+  --secondary: #B78D76;
+  --secondary-hover: #C5A18C;
+  --secondary-subtle: #312A25;
+
+  /* Typography */
+  --text-main: #F6F2ED;
+  --text-muted: #B9A99E;
+  --text-light: #8E7F75;
+  --text-inverse: #211D1A;
+
+  /* Borders & Dividers */
+  --border-color: #493C35;
+  --border-subtle: #382F2A;
+
+  /* Sidebar Palette in Dark */
+  --sidebar-bg: #1A1715;
+  --sidebar-border: #332B25;
+  --sidebar-text: #EAE0D7;
+  --sidebar-text-muted: #9E8E83;
+  --sidebar-active-bg: #2B2521;
+  --sidebar-active-text: #F6F2ED;
+  --sidebar-hover-bg: rgba(246, 242, 237, 0.06);
+
+  /* Header Palette in Dark */
+  --header-bg: #2B2521;
+  --header-border: #493C35;
+
+  /* Semantic Status Colors in Dark */
+  --status-green: #4ADE80;
+  --status-green-bg: rgba(74, 222, 128, 0.12);
+  --status-green-border: rgba(74, 222, 128, 0.28);
+
+  --status-blue: #60A5FA;
+  --status-blue-bg: rgba(96, 165, 250, 0.12);
+  --status-blue-border: rgba(96, 165, 250, 0.28);
+
+  --status-amber: #FBBF24;
+  --status-amber-bg: rgba(251, 191, 36, 0.12);
+  --status-amber-border: rgba(251, 191, 36, 0.28);
+
+  --status-red: #F87171;
+  --status-red-bg: rgba(248, 113, 113, 0.12);
+  --status-red-border: rgba(248, 113, 113, 0.28);
+
+  --status-gray: #94A3B8;
+  --status-gray-bg: rgba(148, 163, 184, 0.12);
+  --status-gray-border: rgba(148, 163, 184, 0.25);
+
+  --status-purple: #C084FC;
+  --status-purple-bg: rgba(192, 132, 252, 0.12);
+  --status-purple-border: rgba(192, 132, 252, 0.28);
+
+  /* Shadows in Dark */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+
+  /* Focus Ring */
+  --focus-ring: 0 0 0 3px rgba(212, 154, 127, 0.35);
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -74,16 +182,108 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-button, input, select, textarea {
+/* Accessible focus styling */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Standardized Form Inputs & Controls */
+input,
+select,
+textarea {
   font-family: inherit;
+  color: var(--text-main);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+/* Links */
 a {
   color: var(--primary);
   text-decoration: none;
+  transition: color 0.15s ease;
 }
+
 a:hover {
   text-decoration: underline;
+  color: var(--primary-hover);
 }
+
+/* Keyframes */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Responsive Layout */
+@media (max-width: 860px) {
+  .mobile-menu-trigger {
+    display: inline-flex !important;
+  }
+
+  .sidebar-close-btn {
+    display: block !important;
+  }
+
+  .sidebar-desktop:not(.sidebar-mobile-open) {
+    transform: translateX(-100%);
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 95;
+    box-shadow: none;
+  }
+
+  .sidebar-mobile-open {
+    transform: translateX(0);
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 95;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .layout-main-content {
+    padding: 18px 16px 36px !important;
+  }
+
+  .header-tagline {
+    display: none !important;
+  }
+}
+

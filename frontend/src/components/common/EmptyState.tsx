@@ -25,11 +25,12 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         justifyContent: 'center',
         padding: '60px 24px',
         textAlign: 'center',
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--bg-surface)',
         borderRadius: 'var(--radius-lg)',
         border: '1px dashed var(--border-color)',
         maxWidth: '560px',
         margin: '24px auto',
+        transition: 'background-color 0.2s ease, border-color 0.2s ease',
       }}
     >
       {icon && (
@@ -37,7 +38,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           style={{
             fontSize: '2.5rem',
             marginBottom: '16px',
-            color: 'var(--text-light)',
+            color: 'var(--text-muted)',
           }}
         >
           {icon}

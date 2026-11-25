@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Card } from '../components/common/Card';
 import { Badge, getStatusBadgeVariant } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { Alert } from '../components/common/Alert';
 import { Table, Column } from '../components/common/Table';
 import { Modal } from '../components/common/Modal';
+import { EmptyState } from '../components/common/EmptyState';
 import { Order, OrderStage, CreateOrderPayload, Seller, User } from '../types/api';
 import {
   fetchOrders,
@@ -24,13 +25,13 @@ interface OrdersPageProps {
 
 const STATUS_FILTERS = [
   'ALL',
+  'PLACED',
   'PROCESSING',
-  'IN_TRANSIT',
   'DISPATCHED',
+  'IN_TRANSIT',
   'DELIVERED',
   'DELAYED',
   'CANCELLED',
-  'PLACED',
 ];
 
 export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNavigate }) => {
@@ -69,15 +70,26 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
     setError(null);
     try {
       const res = await fetchOrders({ status: statusFilter, limit: 50 });
-      setOrders(res.orders);
-      setTotal(res.total);
+      setOrders(res.orders || []);
+      setTotal(res.total || 0);
 
       // If initialOrderId was passed, select it
       if (initialOrderId && !selectedOrder) {
         selectOrderById(initialOrderId);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch orders.');
+      const rawMsg = err instanceof Error ? err.message : 'Failed to fetch orders.';
+      // Sanitize database firewall/connection errors
+      if (rawMsg.includes('Cannot open server') || rawMsg.includes('firewall') || rawMsg.includes('Client with IP')) {
+        setError(
+          'Database connectivity is restricted by current firewall rules. ' +
+          'Ensure your client IP is allowed in Azure SQL Networking or use local database.'
+        );
+      } else if (rawMsg.includes('Connection refused') || rawMsg.includes('Failed to fetch') || rawMsg.includes('503')) {
+        setError('Backend service is temporarily unavailable. Please verify API server status.');
+      } else {
+        setError(rawMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -91,9 +103,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
         fetchOrderStages(orderId),
       ]);
       setSelectedOrder(ord);
-      setSelectedStages(stages);
+      setSelectedStages(stages || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load order details.');
+      const rawMsg = err instanceof Error ? err.message : 'Failed to load order details.';
+      if (rawMsg.includes('Cannot open server') || rawMsg.includes('firewall')) {
+        setError('Database connection error while retrieving order details.');
+      } else {
+        setError(rawMsg);
+      }
     } finally {
       setDetailLoading(false);
     }
@@ -168,16 +185,51 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
     }
   };
 
-  const filteredOrders = orders.filter((o) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      o.external_order_ref.toLowerCase().includes(q) ||
-      (o.customer_name && o.customer_name.toLowerCase().includes(q)) ||
-      (o.seller_business_name && o.seller_business_name.toLowerCase().includes(q)) ||
-      o.order_id.toString().includes(q)
-    );
-  });
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery.trim()) return orders;
+    const q = searchQuery.toLowerCase().trim();
+    return orders.filter((o) => {
+      return (
+        o.external_order_ref.toLowerCase().includes(q) ||
+        (o.customer_name && o.customer_name.toLowerCase().includes(q)) ||
+        (o.seller_business_name && o.seller_business_name.toLowerCase().includes(q)) ||
+        o.order_id.toString().includes(q)
+      );
+    });
+  }, [orders, searchQuery]);
+
+  const hasActiveFilters = statusFilter !== 'ALL' || searchQuery.trim().length > 0;
+
+  const handleClearFilters = () => {
+    setStatusFilter('ALL');
+    setSearchQuery('');
+  };
+
+  const formatShortDate = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatDateTime = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '—';
+    try {
+      return new Date(dateStr).toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateStr;
+    }
+  };
 
   const orderColumns: Column<Order>[] = [
     {
@@ -185,24 +237,79 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
       header: 'Reference',
       render: (row) => (
         <div>
-          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
+          <div style={{ fontWeight: 600, color: 'var(--primary)' }}>
             {row.external_order_ref}
-          </span>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            #{row.order_id}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+            ID #{row.order_id}
           </div>
         </div>
       ),
     },
     {
-      key: 'seller',
-      header: 'Seller',
-      render: (row) => row.seller_business_name || `Seller #${row.seller_id}`,
-    },
-    {
       key: 'customer',
       header: 'Customer',
-      render: (row) => row.customer_name || `User #${row.customer_user_id}`,
+      render: (row) => (
+        <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>
+          {row.customer_name || `Customer #${row.customer_user_id}`}
+        </span>
+      ),
+    },
+    {
+      key: 'seller',
+      header: 'Seller',
+      render: (row) => (
+        <span style={{ color: 'var(--text-muted)' }}>
+          {row.seller_business_name || `Seller #${row.seller_id}`}
+        </span>
+      ),
+    },
+    {
+      key: 'placed_at',
+      header: 'Placed Date',
+      render: (row) => (
+        <span style={{ color: 'var(--text-muted)' }}>
+          {formatShortDate(row.placed_at)}
+        </span>
+      ),
+    },
+    {
+      key: 'expected_delivery_at',
+      header: 'Expected Delivery',
+      render: (row) => {
+        const isPastDue =
+          row.status !== 'DELIVERED' &&
+          row.status !== 'CANCELLED' &&
+          new Date(row.expected_delivery_at).getTime() < Date.now();
+        return (
+          <div>
+            <span
+              style={{
+                color: isPastDue ? 'var(--status-amber)' : 'var(--text-main)',
+                fontWeight: isPastDue ? 600 : 400,
+              }}
+            >
+              {formatShortDate(row.expected_delivery_at)}
+            </span>
+            {isPastDue && (
+              <span
+                style={{
+                  display: 'inline-block',
+                  marginLeft: '6px',
+                  fontSize: '0.7rem',
+                  padding: '1px 6px',
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'var(--status-amber-bg)',
+                  color: 'var(--status-amber)',
+                  fontWeight: 600,
+                }}
+              >
+                Overdue
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'status',
@@ -217,18 +324,8 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
       ),
     },
     {
-      key: 'placed_at',
-      header: 'Placed At',
-      render: (row) => new Date(row.placed_at).toLocaleDateString(),
-    },
-    {
-      key: 'expected_delivery_at',
-      header: 'Expected Delivery',
-      render: (row) => new Date(row.expected_delivery_at).toLocaleDateString(),
-    },
-    {
       key: 'actions',
-      header: 'Action',
+      header: 'Actions',
       align: 'right',
       render: (row) => (
         <Button
@@ -236,7 +333,11 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
           variant={selectedOrder?.order_id === row.order_id ? 'primary' : 'outline'}
           onClick={(e) => {
             e.stopPropagation();
-            selectOrderById(row.order_id);
+            if (selectedOrder?.order_id === row.order_id) {
+              setSelectedOrder(null);
+            } else {
+              selectOrderById(row.order_id);
+            }
           }}
         >
           {selectedOrder?.order_id === row.order_id ? 'Viewing' : 'Details'}
@@ -246,100 +347,238 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
   ];
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Page Header */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px',
+          alignItems: 'flex-start',
+          gap: '16px',
+          flexWrap: 'wrap',
         }}
       >
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)' }}>
-            Order Management
+          <h2
+            style={{
+              fontSize: '1.625rem',
+              fontWeight: 700,
+              color: 'var(--text-main)',
+              margin: 0,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Orders
           </h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+          <p
+            style={{
+              fontSize: '0.875rem',
+              color: 'var(--text-muted)',
+              marginTop: '6px',
+              marginBottom: 0,
+            }}
+          >
             Consignment catalog with baseline schedules, stage progressions, and delivery commitments.
           </p>
         </div>
-        <Button
-          variant="primary"
-          onClick={handleOpenCreateModal}
-        >
-          + New Order
-        </Button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Button
+            variant="outline"
+            onClick={loadOrders}
+            disabled={loading}
+            title="Reload orders from database"
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleOpenCreateModal}
+          >
+            + New Order
+          </Button>
+        </div>
       </div>
 
       {error && <Alert type="error">{error}</Alert>}
 
-      {/* Filter and Search Bar */}
-      <Card padding="16px" style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {STATUS_FILTERS.map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 'var(--radius-full)',
-                  border: statusFilter === s ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                  backgroundColor: statusFilter === s ? 'var(--primary-light)' : '#ffffff',
-                  color: statusFilter === s ? 'var(--primary)' : 'var(--text-muted)',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.1s ease',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {s}
-              </button>
-            ))}
+      {/* Filter and Search Bar Card */}
+      <Card padding="16px">
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '16px',
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* Status Filter Pills */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              overflowX: 'auto',
+              paddingBottom: '2px',
+              alignItems: 'center',
+            }}
+          >
+            {STATUS_FILTERS.map((s) => {
+              const isActive = statusFilter === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatusFilter(s)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 'var(--radius-full)',
+                    border: isActive
+                      ? '1px solid var(--primary)'
+                      : '1px solid var(--border-color)',
+                    backgroundColor: isActive
+                      ? 'var(--primary)'
+                      : 'var(--bg-surface)',
+                    color: isActive
+                      ? 'var(--text-inverse)'
+                      : 'var(--text-muted)',
+                    fontSize: '0.8rem',
+                    fontWeight: isActive ? 600 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    whiteSpace: 'nowrap',
+                    boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.borderColor = 'var(--secondary)';
+                      e.currentTarget.style.color = 'var(--text-main)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.borderColor = 'var(--border-color)';
+                      e.currentTarget.style.color = 'var(--text-muted)';
+                    }
+                  }}
+                >
+                  {s === 'ALL' ? 'All Orders' : s.replace('_', ' ')}
+                </button>
+              );
+            })}
           </div>
 
-          <div style={{ width: '280px' }}>
-            <input
-              type="text"
-              placeholder="Search reference, customer..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 14px',
-                fontSize: '0.85rem',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                outline: 'none',
-              }}
-            />
+          {/* Search Input & Clear Filters */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              flex: '1 1 300px',
+              maxWidth: '440px',
+              minWidth: '240px',
+            }}
+          >
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                type="text"
+                placeholder="Search reference, customer, seller..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 34px 8px 14px',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'var(--bg-surface)',
+                  color: 'var(--text-main)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--primary)';
+                  e.currentTarget.style.boxShadow = 'var(--focus-ring)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search"
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+
+            {hasActiveFilters && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleClearFilters}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                Clear
+              </Button>
+            )}
           </div>
         </div>
       </Card>
 
-      {/* Main Grid: Orders List & Detail Card */}
+      {/* Main Grid: Orders Table & Selected Order Detail Drawer */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: selectedOrder ? '1fr 1fr' : '1fr',
+          gridTemplateColumns: selectedOrder
+            ? 'minmax(0, 1.4fr) minmax(360px, 1fr)'
+            : '1fr',
           gap: '24px',
           alignItems: 'start',
         }}
       >
+        {/* Table Container */}
         <div>
           <Card
             title={`Orders (${filteredOrders.length}${total > filteredOrders.length ? ` of ${total}` : ''})`}
-            subtitle="Click an order row to view operational stage breakdown"
+            subtitle="Click an order row or select Details to inspect operational stage progression"
           >
             {loading ? (
               <LoadingSpinner message="Retrieving orders from SQL Server..." />
+            ) : filteredOrders.length === 0 ? (
+              <EmptyState
+                title="No orders found"
+                description={
+                  hasActiveFilters
+                    ? 'No orders match your current filter and search criteria.'
+                    : 'No orders have been recorded in the platform catalog yet.'
+                }
+                actionLabel={hasActiveFilters ? 'Clear Filters' : '+ Create Order'}
+                onAction={hasActiveFilters ? handleClearFilters : handleOpenCreateModal}
+              />
             ) : (
               <Table
                 columns={orderColumns}
                 data={filteredOrders}
                 keyExtractor={(o) => o.order_id}
-                emptyMessage="No orders matching filter criteria."
                 onRowClick={(row) => selectOrderById(row.order_id)}
               />
             )}
@@ -351,32 +590,37 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
           <div>
             <Card
               title={`Order: ${selectedOrder.external_order_ref}`}
-              subtitle={`ID #${selectedOrder.order_id} • Placed ${new Date(selectedOrder.placed_at).toLocaleDateString()}`}
+              subtitle={`Internal ID #${selectedOrder.order_id} • Placed ${formatShortDate(selectedOrder.placed_at)}`}
               action={
-                <Button size="sm" variant="ghost" onClick={() => setSelectedOrder(null)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedOrder(null)}
+                  title="Close details panel"
+                >
                   Close &times;
                 </Button>
               }
             >
               {detailLoading ? (
-                <LoadingSpinner message="Loading stages..." />
+                <LoadingSpinner message="Loading stage progression..." />
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Status Banner */}
+                  {/* Status & Delivery Summary Banner */}
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '14px',
-                      backgroundColor: '#f8fafc',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                      gap: '12px',
+                      padding: '16px',
+                      backgroundColor: 'var(--bg-surface-subtle)',
                       borderRadius: 'var(--radius-md)',
-                      border: '1px solid #e2e8f0',
+                      border: '1px solid var(--border-color)',
                     }}
                   >
                     <div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Status</div>
-                      <div style={{ marginTop: '4px' }}>
+                      <div style={{ marginTop: '6px' }}>
                         <Badge
                           label={selectedOrder.status}
                           variant={getStatusBadgeVariant(selectedOrder.status)}
@@ -387,68 +631,188 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
 
                     <div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Expected Delivery</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '4px' }}>
-                        {new Date(selectedOrder.expected_delivery_at).toLocaleString()}
+                      <div
+                        style={{
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          color: 'var(--text-main)',
+                          marginTop: '6px',
+                        }}
+                      >
+                        {formatDateTime(selectedOrder.expected_delivery_at)}
                       </div>
                     </div>
 
                     {selectedOrder.actual_delivery_at && (
                       <div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Actual Delivery</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--status-green)', marginTop: '4px' }}>
-                          {new Date(selectedOrder.actual_delivery_at).toLocaleString()}
+                        <div
+                          style={{
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            color: 'var(--status-green)',
+                            marginTop: '6px',
+                          }}
+                        >
+                          {formatDateTime(selectedOrder.actual_delivery_at)}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Stage Progression Cards */}
-                  <div>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '12px', color: 'var(--text-main)' }}>
-                      Planned vs. Observed Operational Stages
-                    </h4>
+                  {/* Customer and Seller Attribution */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '12px',
+                      padding: '12px 14px',
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                        Customer
+                      </div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                        {selectedOrder.customer_name || `User #${selectedOrder.customer_user_id}`}
+                      </div>
+                    </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {selectedStages.map((s) => (
-                        <div
-                          key={s.stage_id}
-                          style={{
-                            padding: '12px 14px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: 'var(--radius-md)',
-                            border: '1px solid var(--border-color)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                          }}
-                        >
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 600 }}>
-                                #{s.sequence_no}
-                              </span>
-                              <strong style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>
-                                {s.stage_code}
-                              </strong>
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                              Planned: {s.planned_start_at ? new Date(s.planned_start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'} &rarr;{' '}
-                              {s.planned_end_at ? new Date(s.planned_end_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
-                            </div>
-                          </div>
-
-                          <Badge
-                            label={s.status}
-                            variant={getStatusBadgeVariant(s.status)}
-                            size="sm"
-                          />
-                        </div>
-                      ))}
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                        Seller
+                      </div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                        {selectedOrder.seller_business_name || `Seller #${selectedOrder.seller_id}`}
+                      </div>
                     </div>
                   </div>
 
+                  {/* Stage Progression Cards */}
+                  <div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '10px',
+                      }}
+                    >
+                      <h4
+                        style={{
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          color: 'var(--text-main)',
+                          margin: 0,
+                        }}
+                      >
+                        Planned vs. Observed Operational Stages
+                      </h4>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {selectedStages.length} Stages
+                      </span>
+                    </div>
+
+                    {selectedStages.length === 0 ? (
+                      <div
+                        style={{
+                          padding: '20px',
+                          textAlign: 'center',
+                          fontSize: '0.85rem',
+                          color: 'var(--text-muted)',
+                          backgroundColor: 'var(--bg-surface-subtle)',
+                          borderRadius: 'var(--radius-md)',
+                          border: '1px dashed var(--border-color)',
+                        }}
+                      >
+                        No operational stages recorded for this consignment.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {selectedStages.map((s) => (
+                          <div
+                            key={s.stage_id}
+                            style={{
+                              padding: '12px 14px',
+                              backgroundColor: 'var(--bg-surface)',
+                              borderRadius: 'var(--radius-md)',
+                              border: '1px solid var(--border-color)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '12px',
+                              transition: 'border-color 0.15s ease',
+                            }}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    color: 'var(--primary)',
+                                    fontWeight: 700,
+                                    backgroundColor: 'var(--primary-subtle)',
+                                    padding: '1px 6px',
+                                    borderRadius: 'var(--radius-sm)',
+                                  }}
+                                >
+                                  #{s.sequence_no}
+                                </span>
+                                <strong
+                                  style={{
+                                    fontSize: '0.85rem',
+                                    color: 'var(--text-main)',
+                                    letterSpacing: '0.02em',
+                                  }}
+                                >
+                                  {s.stage_code}
+                                </strong>
+                              </div>
+
+                              <div
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-muted)',
+                                  marginTop: '4px',
+                                }}
+                              >
+                                <span>
+                                  Planned: {formatDateTime(s.planned_start_at)} &rarr;{' '}
+                                  {formatDateTime(s.planned_end_at)}
+                                </span>
+                                {s.actual_end_at && (
+                                  <div style={{ color: 'var(--status-green)', marginTop: '2px' }}>
+                                    Completed: {formatDateTime(s.actual_end_at)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <Badge
+                              label={s.status}
+                              variant={getStatusBadgeVariant(s.status)}
+                              size="sm"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Context Actions */}
-                  <div style={{ display: 'flex', gap: '10px', paddingTop: '8px', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '10px',
+                      paddingTop: '16px',
+                      borderTop: '1px solid var(--border-color)',
+                      flexWrap: 'wrap',
+                    }}
+                  >
                     <Button
                       variant="primary"
                       onClick={() => onNavigate('timeline', { orderId: selectedOrder.order_id })}
@@ -475,14 +839,18 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
         )}
       </div>
 
-      {/* Create Order Modal dynamically backed by real sellers and customers */}
+      {/* Create Order Modal */}
       <Modal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         title="Create New Order"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setIsCreateModalOpen(false)} disabled={createLoading}>
+            <Button
+              variant="secondary"
+              onClick={() => setIsCreateModalOpen(false)}
+              disabled={createLoading}
+            >
               Cancel
             </Button>
             <Button
@@ -501,10 +869,20 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+              <label
+                htmlFor="external_order_ref"
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: '6px',
+                }}
+              >
                 External Order Reference *
               </label>
               <input
+                id="external_order_ref"
                 type="text"
                 value={formData.external_order_ref}
                 onChange={(e) => setFormData({ ...formData, external_order_ref: e.target.value })}
@@ -516,16 +894,30 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--border-color)',
                   fontSize: '0.875rem',
+                  backgroundColor: 'var(--bg-surface)',
+                  color: 'var(--text-main)',
+                  outline: 'none',
+                  boxSizing: 'border-box',
                 }}
               />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                <label
+                  htmlFor="seller_id"
+                  style={{
+                    display: 'block',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: 'var(--text-muted)',
+                    marginBottom: '6px',
+                  }}
+                >
                   Registered Seller *
                 </label>
                 <select
+                  id="seller_id"
                   value={formData.seller_id}
                   onChange={(e) => setFormData({ ...formData, seller_id: e.target.value })}
                   required
@@ -535,7 +927,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
                     borderRadius: 'var(--radius-md)',
                     border: '1px solid var(--border-color)',
                     fontSize: '0.875rem',
-                    backgroundColor: '#ffffff',
+                    backgroundColor: 'var(--bg-surface)',
+                    color: 'var(--text-main)',
+                    outline: 'none',
                   }}
                 >
                   {availableSellers.length === 0 ? (
@@ -551,10 +945,20 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                <label
+                  htmlFor="customer_user_id"
+                  style={{
+                    display: 'block',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: 'var(--text-muted)',
+                    marginBottom: '6px',
+                  }}
+                >
                   Customer User *
                 </label>
                 <select
+                  id="customer_user_id"
                   value={formData.customer_user_id}
                   onChange={(e) => setFormData({ ...formData, customer_user_id: e.target.value })}
                   required
@@ -564,7 +968,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
                     borderRadius: 'var(--radius-md)',
                     border: '1px solid var(--border-color)',
                     fontSize: '0.875rem',
-                    backgroundColor: '#ffffff',
+                    backgroundColor: 'var(--bg-surface)',
+                    color: 'var(--text-main)',
+                    outline: 'none',
                   }}
                 >
                   {availableCustomers.length === 0 ? (
@@ -581,10 +987,20 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+              <label
+                htmlFor="expected_delivery_days"
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: '6px',
+                }}
+              >
                 Delivery SLA Window (Days from now)
               </label>
               <select
+                id="expected_delivery_days"
                 value={formData.expected_delivery_days}
                 onChange={(e) => setFormData({ ...formData, expected_delivery_days: e.target.value })}
                 style={{
@@ -593,7 +1009,9 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--border-color)',
                   fontSize: '0.875rem',
-                  backgroundColor: '#ffffff',
+                  backgroundColor: 'var(--bg-surface)',
+                  color: 'var(--text-main)',
+                  outline: 'none',
                 }}
               >
                 <option value="1">1 Day (Express)</option>
@@ -601,7 +1019,14 @@ export const OrdersPage: React.FC<OrdersPageProps> = ({ initialOrderId, onNaviga
                 <option value="3">3 Days (Default SLA)</option>
                 <option value="5">5 Days (Economy)</option>
               </select>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+              <p
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--text-muted)',
+                  marginTop: '6px',
+                  marginBottom: 0,
+                }}
+              >
                 Causara automatically calculates 5 proportional baseline stages based on the selected SLA window.
               </p>
             </div>

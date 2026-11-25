@@ -22,11 +22,11 @@ export const Alert: React.FC<AlertProps> = ({
       case 'success':
         return { bg: 'var(--status-green-bg)', border: 'var(--status-green-border)', text: 'var(--status-green)' };
       case 'warning':
-        return { bg: 'var(--status-amber-bg)', border: 'var(--status-amber-border)', text: '#b45309' };
+        return { bg: 'var(--status-amber-bg)', border: 'var(--status-amber-border)', text: 'var(--status-amber)' };
       case 'error':
         return { bg: 'var(--status-red-bg)', border: 'var(--status-red-border)', text: 'var(--status-red)' };
       case 'epistemology':
-        return { bg: '#faf5ff', border: '#e9d5ff', text: '#6b21a8' };
+        return { bg: 'var(--status-purple-bg)', border: 'var(--status-purple-border)', text: 'var(--status-purple)' };
       case 'info':
       default:
         return { bg: 'var(--status-blue-bg)', border: 'var(--status-blue-border)', text: 'var(--status-blue)' };
@@ -48,6 +48,7 @@ export const Alert: React.FC<AlertProps> = ({
         alignItems: 'flex-start',
         gap: '12px',
         marginBottom: '16px',
+        transition: 'background-color 0.2s ease, border-color 0.2s ease',
         ...style,
       }}
       role="alert"

@@ -21,21 +21,21 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const getStyles = (): React.CSSProperties => {
     let bg = 'var(--primary)';
-    let color = '#ffffff';
+    let color = 'var(--text-inverse)';
     let border = '1px solid var(--primary)';
 
     if (variant === 'secondary') {
-      bg = '#f1f5f9';
-      color = '#0f172a';
-      border = '1px solid #e2e8f0';
+      bg = 'var(--bg-surface-subtle)';
+      color = 'var(--text-main)';
+      border = '1px solid var(--border-color)';
     } else if (variant === 'outline') {
       bg = 'transparent';
       color = 'var(--primary)';
       border = '1px solid var(--primary-border)';
     } else if (variant === 'danger') {
-      bg = '#dc2626';
+      bg = 'var(--status-red)';
       color = '#ffffff';
-      border = '1px solid #dc2626';
+      border = '1px solid var(--status-red)';
     } else if (variant === 'ghost') {
       bg = 'transparent';
       color = 'var(--text-muted)';
@@ -58,9 +58,10 @@ export const Button: React.FC<ButtonProps> = ({
       color,
       border,
       cursor: disabled || loading ? 'not-allowed' : 'pointer',
-      opacity: disabled || loading ? 0.65 : 1,
+      opacity: disabled || loading ? 0.6 : 1,
       transition: 'all 0.15s ease',
       whiteSpace: 'nowrap',
+      lineHeight: 1.25,
       ...style,
     };
   };

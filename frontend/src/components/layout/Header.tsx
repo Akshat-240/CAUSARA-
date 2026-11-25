@@ -1,5 +1,7 @@
 import React from 'react';
 import { HealthData, DemoActor, AuthUser } from '../../types/api';
+import { ThemeToggle } from '../common/ThemeToggle';
+import { useTheme } from '../../context/ThemeContext';
 
 interface HeaderProps {
   health: HealthData | null;
@@ -11,6 +13,7 @@ interface HeaderProps {
   onActorChange: (actor: DemoActor) => void;
   currentUser?: AuthUser | null;
   onLogout?: () => void;
+  onToggleMobileMenu?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,50 +26,78 @@ export const Header: React.FC<HeaderProps> = ({
   onActorChange,
   currentUser,
   onLogout,
+  onToggleMobileMenu,
 }) => {
+  const { theme } = useTheme();
+  const logoSrc = theme === 'dark' ? '/assets/causara-logo-dark.svg' : '/assets/causara-logo-light.svg';
   return (
     <header
       style={{
         height: 'var(--header-height)',
-        backgroundColor: '#ffffff',
-        borderBottom: '1px solid var(--border-color)',
+        backgroundColor: 'var(--header-bg)',
+        borderBottom: '1px solid var(--header-border)',
         padding: '0 24px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         position: 'sticky',
         top: 0,
-        zIndex: 100,
+        zIndex: 80,
         boxShadow: 'var(--shadow-sm)',
+        transition: 'background-color 0.2s ease, border-color 0.2s ease',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div>
-          <h1
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        {onToggleMobileMenu && (
+          <button
+            type="button"
+            onClick={onToggleMobileMenu}
+            aria-label="Toggle navigation menu"
             style={{
-              fontSize: '1.25rem',
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
+              display: 'none',
+              background: 'none',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              padding: '6px 8px',
               color: 'var(--text-main)',
-              lineHeight: 1.1,
+              cursor: 'pointer',
             }}
+            className="mobile-menu-trigger"
           >
-            Caus<span style={{ color: 'var(--primary)' }}>ara</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img
+            src={logoSrc}
+            alt="Causara"
+            style={{ height: '26px', width: 'auto', display: 'block' }}
+          />
+          <h1 style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', border: 0 }}>
+            Causara
           </h1>
           <p
             style={{
               fontSize: '0.72rem',
               color: 'var(--text-muted)',
               whiteSpace: 'nowrap',
+              borderLeft: '1px solid var(--border-color)',
+              paddingLeft: '12px',
             }}
+            className="header-tagline"
           >
             Explainable Order Delay Intelligence & Intervention Analysis Platform
           </p>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        {/* Backend Connectivity Indicator reflecting live health and database connection */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        {/* Backend Connectivity Indicator */}
         <div
           style={{
             display: 'flex',
@@ -76,18 +107,23 @@ export const Header: React.FC<HeaderProps> = ({
             padding: '4px 10px',
             borderRadius: 'var(--radius-full)',
             backgroundColor: healthLoading
-              ? '#fffbeb'
+              ? 'var(--status-amber-bg)'
               : healthError
-              ? '#fef2f2'
-              : '#f0fdf4',
+              ? 'var(--status-red-bg)'
+              : 'var(--status-green-bg)',
             color: healthLoading
-              ? '#d97706'
+              ? 'var(--status-amber)'
               : healthError
-              ? '#dc2626'
-              : '#16a34a',
+              ? 'var(--status-red)'
+              : 'var(--status-green)',
             border: `1px solid ${
-              healthLoading ? '#fde68a' : healthError ? '#fecaca' : '#bbf7d0'
+              healthLoading
+                ? 'var(--status-amber-border)'
+                : healthError
+                ? 'var(--status-red-border)'
+                : 'var(--status-green-border)'
             }`,
+            transition: 'all 0.2s ease',
           }}
           title={
             healthError
@@ -119,16 +155,19 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
+        {/* Theme Toggle Button */}
+        <ThemeToggle />
+
         {/* Demo Mode Actor Switcher dynamically populated from backend API */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '4px 12px',
-            backgroundColor: '#f1f5f9',
+            padding: '4px 10px',
+            backgroundColor: 'var(--bg-surface-subtle)',
             borderRadius: 'var(--radius-md)',
-            border: '1px solid #cbd5e1',
+            border: '1px solid var(--border-color)',
             fontSize: '0.775rem',
           }}
         >
@@ -138,8 +177,8 @@ export const Header: React.FC<HeaderProps> = ({
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.04em',
-              color: '#475569',
-              backgroundColor: '#e2e8f0',
+              color: 'var(--primary)',
+              backgroundColor: 'var(--primary-subtle)',
               padding: '2px 6px',
               borderRadius: '4px',
             }}
@@ -161,6 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
               color: 'var(--text-main)',
               cursor: 'pointer',
               outline: 'none',
+              padding: 0,
             }}
             aria-label="Select Demo Actor"
             disabled={actorsLoading || actors.length === 0}
@@ -184,10 +224,10 @@ export const Header: React.FC<HeaderProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
-              padding: '4px 12px',
-              backgroundColor: '#f8fafc',
+              padding: '4px 10px',
+              backgroundColor: 'var(--bg-surface-subtle)',
               borderRadius: 'var(--radius-md)',
-              border: '1px solid #e2e8f0',
+              border: '1px solid var(--border-color)',
               fontSize: '0.8rem',
             }}
           >
@@ -197,7 +237,7 @@ export const Header: React.FC<HeaderProps> = ({
                 height: '28px',
                 borderRadius: '50%',
                 backgroundColor: 'var(--primary)',
-                color: '#ffffff',
+                color: 'var(--text-inverse)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -229,19 +269,19 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={onLogout}
                 style={{
-                  marginLeft: '6px',
+                  marginLeft: '4px',
                   padding: '4px 8px',
                   fontSize: '0.75rem',
                   fontWeight: 600,
-                  color: '#dc2626',
-                  backgroundColor: '#fee2e2',
-                  border: '1px solid #fecaca',
+                  color: 'var(--status-red)',
+                  backgroundColor: 'var(--status-red-bg)',
+                  border: '1px solid var(--status-red-border)',
                   borderRadius: 'var(--radius-sm)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
-                  transition: 'background-color 0.15s ease',
+                  transition: 'all 0.15s ease',
                 }}
                 title="Sign out of Causara workspace"
               >

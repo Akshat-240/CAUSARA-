@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { ThemeProvider } from './context/ThemeContext';
 import { Layout } from './components/layout/Layout';
 import { NavigationTab } from './components/layout/Sidebar';
 import { DemoActor, HealthData, AuthUser } from './types/api';
@@ -23,7 +24,7 @@ interface NavigationParams {
   decisionId?: number;
 }
 
-export const App: React.FC = () => {
+const CausaraApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavigationTab>('overview');
   const [navParams, setNavParams] = useState<NavigationParams>({});
 
@@ -71,7 +72,6 @@ export const App: React.FC = () => {
         setActiveActor((prev) => prev || actorList[0]);
       }
     } catch {
-      // If actors fail to load due to backend offline, error banner will reflect connectivity
       setActors([]);
       setActiveActor(null);
     } finally {
@@ -225,6 +225,14 @@ export const App: React.FC = () => {
     >
       {renderContent()}
     </Layout>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <CausaraApp />
+    </ThemeProvider>
   );
 };
 

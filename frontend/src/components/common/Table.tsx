@@ -31,7 +31,7 @@ export function Table<T>({
           textAlign: 'center',
           color: 'var(--text-muted)',
           fontSize: '0.875rem',
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--bg-surface)',
           borderRadius: 'var(--radius-md)',
           border: '1px solid var(--border-color)',
         }}
@@ -47,8 +47,9 @@ export function Table<T>({
         overflowX: 'auto',
         borderRadius: 'var(--radius-lg)',
         border: '1px solid var(--border-color)',
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--bg-surface)',
         boxShadow: 'var(--shadow-sm)',
+        transition: 'background-color 0.2s ease, border-color 0.2s ease',
       }}
     >
       <table
@@ -62,7 +63,7 @@ export function Table<T>({
         <thead>
           <tr
             style={{
-              backgroundColor: '#f8fafc',
+              backgroundColor: 'var(--bg-surface-subtle)',
               borderBottom: '1px solid var(--border-color)',
             }}
           >
@@ -96,7 +97,7 @@ export function Table<T>({
                 transition: 'background-color 0.1s ease',
               }}
               onMouseEnter={(e) => {
-                if (onRowClick) e.currentTarget.style.backgroundColor = '#f8fafc';
+                if (onRowClick) e.currentTarget.style.backgroundColor = 'var(--bg-surface-subtle)';
               }}
               onMouseLeave={(e) => {
                 if (onRowClick) e.currentTarget.style.backgroundColor = 'transparent';

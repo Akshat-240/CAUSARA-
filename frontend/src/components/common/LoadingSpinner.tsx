@@ -28,7 +28,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
         style={{
           width: dim,
           height: dim,
-          border: '3px solid #e2e8f0',
+          border: '3px solid var(--border-color)',
           borderTopColor: 'var(--primary)',
           borderRadius: '50%',
           animation: 'spin 0.75s linear infinite',

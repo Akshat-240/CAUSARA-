@@ -41,7 +41,7 @@ export const Badge: React.FC<BadgeProps> = ({
       case 'danger':
         return { bg: 'var(--status-red-bg)', text: 'var(--status-red)', border: 'var(--status-red-border)' };
       case 'purple':
-        return { bg: '#faf5ff', text: '#9333ea', border: '#e9d5ff' };
+        return { bg: 'var(--status-purple-bg)', text: 'var(--status-purple)', border: 'var(--status-purple-border)' };
       case 'gray':
       case 'neutral':
       default:
@@ -69,6 +69,7 @@ export const Badge: React.FC<BadgeProps> = ({
         lineHeight: 1.2,
         letterSpacing: '0.01em',
         whiteSpace: 'nowrap',
+        transition: 'background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease',
       }}
     >
       {dot && (
