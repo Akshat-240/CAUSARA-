@@ -8,9 +8,6 @@ Causara is an explainable e-commerce order delay intelligence and intervention a
 
 ## Visual Tour
 
-
-![Causara Order Timeline](docs/assets/order-timeline.png)
-
 ### Workspace Authentication & Role Selection
 Porcelain & Terracotta Design System 1.0 sign-in and registration supporting multi-role workspace access:
 
