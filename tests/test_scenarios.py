@@ -238,12 +238,12 @@ def test_auto_generate_scenarios(seed_scenario_order):
         assert sc["risk_level"] in ("LOW", "MEDIUM", "HIGH")
 
 
-def test_scenario_api_endpoints(client, seed_scenario_order):
+def test_scenario_api_endpoints(auth_client, seed_scenario_order):
     """Test scenario REST API routes."""
     case_id = seed_scenario_order["case_id"]
 
     # 1. GET /cases/<case_id>/interventions
-    res_cand = client.get(f"/api/v1/cases/{case_id}/interventions")
+    res_cand = auth_client.get(f"/api/v1/cases/{case_id}/interventions")
     assert res_cand.status_code == 200
     cand_data = res_cand.get_json()["data"]
     assert cand_data["case_id"] == case_id
@@ -254,7 +254,7 @@ def test_scenario_api_endpoints(client, seed_scenario_order):
         "intervention_ids": [1, 5],
         "assumptions": ["API simulation test"],
     }
-    res_post = client.post(f"/api/v1/cases/{case_id}/scenarios", json=post_payload)
+    res_post = auth_client.post(f"/api/v1/cases/{case_id}/scenarios", json=post_payload)
     assert res_post.status_code == 201
     sc_data = res_post.get_json()["data"]
     scenario_id = sc_data["scenario_id"]
@@ -262,11 +262,11 @@ def test_scenario_api_endpoints(client, seed_scenario_order):
     assert sc_data["scenario_name"] == "API Test Scenario"
 
     # 3. GET /scenarios/<scenario_id>
-    res_get = client.get(f"/api/v1/scenarios/{scenario_id}")
+    res_get = auth_client.get(f"/api/v1/scenarios/{scenario_id}")
     assert res_get.status_code == 200
     assert res_get.get_json()["data"]["scenario_id"] == scenario_id
 
     # 4. GET /cases/<case_id>/scenarios
-    res_list = client.get(f"/api/v1/cases/{case_id}/scenarios")
+    res_list = auth_client.get(f"/api/v1/cases/{case_id}/scenarios")
     assert res_list.status_code == 200
     assert res_list.get_json()["data"]["scenario_count"] >= 1

@@ -25,6 +25,75 @@ import {
 } from '../types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const AUTH_TOKEN_KEY = 'causara_token';
+
+let inMemoryToken: string | null = null;
+let unauthorizedHandler: (() => void) | null = null;
+
+export function getAuthToken(): string | null {
+  if (inMemoryToken) {
+    return inMemoryToken;
+  }
+  try {
+    const stored = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (stored) {
+      inMemoryToken = stored;
+      return stored;
+    }
+    const storedUser = localStorage.getItem('causara_user');
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser) as { token?: string };
+      if (parsed?.token) {
+        inMemoryToken = parsed.token;
+        return parsed.token;
+      }
+    }
+  } catch {
+    // Ignore storage read failures
+  }
+  return null;
+}
+
+export function setAuthToken(token: string | null): void {
+  inMemoryToken = token;
+  try {
+    if (token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+  } catch {
+    // Ignore storage write failures
+  }
+}
+
+export function clearAuthSession(): void {
+  inMemoryToken = null;
+  try {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem('causara_user');
+  } catch {
+    // Ignore storage clear failures
+  }
+}
+
+export function registerUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
+
+function isSameApiOrigin(targetUrl: string): boolean {
+  if (!/^https?:\/\//i.test(targetUrl)) {
+    return true;
+  }
+  try {
+    const base = /^https?:\/\//i.test(API_BASE_URL)
+      ? new URL(API_BASE_URL).origin
+      : window.location.origin;
+    return new URL(targetUrl).origin === base;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Generic request handler enforcing standard Causara API envelopes,
@@ -39,6 +108,12 @@ async function request<T>(
 
   if (!headers.has('Accept')) {
     headers.set('Accept', 'application/json');
+  }
+
+  // Attach Authorization Bearer token only for requests targeting Causara API origin
+  const token = getAuthToken();
+  if (token && !headers.has('Authorization') && isSameApiOrigin(url)) {
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
   // Set Content-Type only if body is string (not FormData)
@@ -61,6 +136,16 @@ async function request<T>(
   }
 
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      !endpoint.startsWith('/auth/login') &&
+      !endpoint.startsWith('/auth/register')
+    ) {
+      clearAuthSession();
+      if (unauthorizedHandler) {
+        unauthorizedHandler();
+      }
+    }
     let errorMessage = `HTTP ${response.status} (${response.statusText})`;
     try {
       const errorJson: ApiErrorResponse = await response.json();
@@ -421,11 +506,17 @@ export async function verifyDecision(
 export async function fetchDecisionVerification(
   decisionId: number,
   signal?: AbortSignal
-): Promise<OutcomeVerification> {
-  return request<OutcomeVerification>(`/decisions/${decisionId}/verification`, {
+): Promise<OutcomeVerification | null> {
+  const res = await request<
+    OutcomeVerification | { verified: false; decision_id: number; decision_status?: string; verification: null }
+  >(`/decisions/${decisionId}/verification`, {
     method: 'GET',
     signal,
   });
+  if (res && 'verified' in res && res.verified === false) {
+    return null;
+  }
+  return res as OutcomeVerification;
 }
 
 // ============================================================================

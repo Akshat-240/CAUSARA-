@@ -2,6 +2,7 @@
 
 from flask import Blueprint, request
 from app.api.errors import APIError, format_success_response
+from app.security import require_auth, require_roles
 from app.services.event_service import EventService
 
 events_bp = Blueprint("events", __name__)
@@ -9,6 +10,7 @@ _event_service = EventService()
 
 
 @events_bp.route("/orders/<int:order_id>/events", methods=["POST"])
+@require_roles("SELLER", "ANALYST", "MANAGER", "ADMIN", allow_internal_service=True)
 def ingest_order_event(order_id: int):
     """Ingest a new order lifecycle event or return an idempotent duplicate response.
 
@@ -50,6 +52,7 @@ def ingest_order_event(order_id: int):
 
 
 @events_bp.route("/orders/<int:order_id>/events", methods=["GET"])
+@require_auth()
 def get_order_events(order_id: int):
     """Retrieve the chronological immutable timeline of events for an order."""
     events = _event_service.list_order_events(order_id=order_id)

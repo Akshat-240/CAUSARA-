@@ -184,6 +184,16 @@ class DecisionService:
                 status_code=404,
             )
 
+        if decision.get("decision_status") not in ("APPROVED", "EXECUTED"):
+            raise APIError(
+                code="INVALID_DECISION_STATE",
+                message=(
+                    f"Cannot verify decision in status '{decision.get('decision_status')}'. "
+                    "Decision must be APPROVED or EXECUTED prior to empirical outcome verification."
+                ),
+                status_code=409,
+            )
+
         # If actual_delivery_at is not supplied, check the underlying order's actual delivery
         actual_at = actual_delivery_at
         if not actual_at:
@@ -258,9 +268,13 @@ class DecisionService:
 
         verification = self.decision_repo.get_verification_by_decision_id(decision_id)
         if not verification:
-            raise APIError(
-                code="RESOURCE_NOT_FOUND",
-                message=f"No verification record found for decision {decision_id}.",
-                status_code=404,
-            )
-        return verification
+            return {
+                "verified": False,
+                "decision_id": decision_id,
+                "decision_status": decision.get("decision_status"),
+                "verification": None,
+            }
+        return {
+            **verification,
+            "verified": True,
+        }

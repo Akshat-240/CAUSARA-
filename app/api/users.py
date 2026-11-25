@@ -4,6 +4,7 @@ from typing import Any, Optional
 from flask import Blueprint, request
 from app.api.errors import format_success_response
 from app.repositories.user_repository import UserRepository
+from app.security import require_auth, validate_pagination
 
 users_bp = Blueprint("users", __name__)
 _user_repo = UserRepository()
@@ -19,11 +20,11 @@ def _format_datetime(dt_val: Any) -> Optional[str]:
 
 
 @users_bp.route("/users", methods=["GET"])
+@require_auth()
 def list_users():
     """List users with optional role filtering."""
     role = request.args.get("role")
-    limit = int(request.args.get("limit", 50))
-    offset = int(request.args.get("offset", 0))
+    limit, offset = validate_pagination(request.args.get("limit"), request.args.get("offset"))
 
     users = _user_repo.list_users(role=role, limit=limit, offset=offset)
     formatted = []
@@ -46,6 +47,7 @@ def list_users():
 
 
 @users_bp.route("/actors", methods=["GET"])
+@require_auth()
 def list_actors():
     """Retrieve active operational actors with assigned roles for client-side demo attribution."""
     actors = _user_repo.list_actors()

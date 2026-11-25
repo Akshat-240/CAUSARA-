@@ -128,7 +128,7 @@ def seed_order():
 # ============================================================================
 # 1. Atomic Event & Outbox Ingestion
 # ============================================================================
-def test_atomic_event_and_outbox_insertion(client, seed_order):
+def test_atomic_event_and_outbox_insertion(auth_client, seed_order):
     """Verify that event and outbox records are committed together in the same transaction."""
     order_id = seed_order["order_id"]
     key = f"outbox-atomic-{seed_order['uid']}"
@@ -141,7 +141,7 @@ def test_atomic_event_and_outbox_insertion(client, seed_order):
         "source_type": "MANUAL_DASHBOARD",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": key},
         json=payload,
@@ -233,7 +233,7 @@ def test_rollback_if_outbox_insertion_fails(seed_order, monkeypatch):
         assert cur.fetchone()[0] == 0
 
 
-def test_duplicate_ingestion_creates_no_additional_outbox(client, seed_order):
+def test_duplicate_ingestion_creates_no_additional_outbox(auth_client, seed_order):
     """Verify that an idempotent duplicate replay does not produce an additional outbox record."""
     order_id = seed_order["order_id"]
     key = f"outbox-dup-{seed_order['uid']}"
@@ -246,12 +246,12 @@ def test_duplicate_ingestion_creates_no_additional_outbox(client, seed_order):
     }
 
     # Initial request -> 201 Created
-    res1 = client.post(f"/api/v1/orders/{order_id}/events", headers={"Idempotency-Key": key}, json=payload)
+    res1 = auth_client.post(f"/api/v1/orders/{order_id}/events", headers={"Idempotency-Key": key}, json=payload)
     assert res1.status_code == 201
     event_id = res1.get_json()["data"]["event_id"]
 
     # Replay request -> 200 OK
-    res2 = client.post(f"/api/v1/orders/{order_id}/events", headers={"Idempotency-Key": key}, json=payload)
+    res2 = auth_client.post(f"/api/v1/orders/{order_id}/events", headers={"Idempotency-Key": key}, json=payload)
     assert res2.status_code == 200
     assert res2.get_json()["data"]["is_duplicate"] is True
 
@@ -268,7 +268,7 @@ def test_duplicate_ingestion_creates_no_additional_outbox(client, seed_order):
 # ============================================================================
 # 2. Worker Processing Lifecycle (Success & Downstream Idempotency)
 # ============================================================================
-def test_successful_worker_processing(client, seed_order):
+def test_successful_worker_processing(auth_client, seed_order):
     """Verify background worker claims pending message, executes downstream effect, and marks PUBLISHED."""
     order_id = seed_order["order_id"]
     key = f"outbox-success-{seed_order['uid']}"
@@ -278,7 +278,7 @@ def test_successful_worker_processing(client, seed_order):
         "stage_id": seed_order["stage_id"],
         "occurred_at": "2026-11-09T10:00:00Z",
     }
-    res = client.post(f"/api/v1/orders/{order_id}/events", headers={"Idempotency-Key": key}, json=payload)
+    res = auth_client.post(f"/api/v1/orders/{order_id}/events", headers={"Idempotency-Key": key}, json=payload)
     event_id = res.get_json()["data"]["event_id"]
 
     # Run OutboxProcessor
@@ -536,14 +536,14 @@ def test_maximum_retry_exhaustion_marks_failed(seed_order):
 # ============================================================================
 # 4. Concurrency, Lease Expiration & Stale Worker Protection
 # ============================================================================
-def test_concurrent_worker_claiming_no_duplicates(client, seed_order):
+def test_concurrent_worker_claiming_no_duplicates(auth_client, seed_order):
     """Verify multiple concurrent workers claim messages with zero duplicate assignments."""
     order_id = seed_order["order_id"]
     uid = seed_order["uid"]
 
     # Ingest 6 events
     for i in range(6):
-        res = client.post(
+        res = auth_client.post(
             f"/api/v1/orders/{order_id}/events",
             headers={"Idempotency-Key": f"concur-outbox-{uid}-{i}"},
             json={
@@ -657,9 +657,9 @@ def test_stale_worker_attempting_to_complete_reclaimed_message_fails(seed_order)
 # ============================================================================
 # 5. Observability Endpoint & Metrics
 # ============================================================================
-def test_outbox_observability_endpoint(client, seed_order):
+def test_outbox_observability_endpoint(auth_client, seed_order):
     """Verify that GET /api/v1/internal/outbox/stats returns accurate metrics with valid key."""
-    response = client.get(
+    response = auth_client.get(
         "/api/v1/internal/outbox/stats",
         headers={"X-Internal-API-Key": "test-internal-api-key"},
     )

@@ -574,7 +574,7 @@ def test_job_failure_and_retry_behavior(seed_timeline_order):
 # ============================================================================
 # 14. API Response Validation
 # ============================================================================
-def test_api_endpoints(client, seed_timeline_order):
+def test_api_endpoints(auth_client, seed_timeline_order):
     """Verify REST API endpoints for timeline retrieval, reconstruction, and job management."""
     order_id = seed_timeline_order["order_id"]
     stages = seed_timeline_order["stage_ids"]
@@ -584,7 +584,7 @@ def test_api_endpoints(client, seed_timeline_order):
     _insert_event(order_id, stages["DISPATCH"], "DISPATCHED", t0 + timedelta(hours=4), t0 + timedelta(hours=4))
 
     # 1. GET /api/v1/orders/{id}/timeline
-    res = client.get(f"/api/v1/orders/{order_id}/timeline")
+    res = auth_client.get(f"/api/v1/orders/{order_id}/timeline")
     assert res.status_code == 200
     assert res.is_json
     body = res.get_json()
@@ -596,7 +596,7 @@ def test_api_endpoints(client, seed_timeline_order):
     assert len(data["stage_progression"]) == 5
 
     # 2. POST /api/v1/orders/{id}/timeline/reconstruct (synchronous)
-    res_post = client.post(
+    res_post = auth_client.post(
         f"/api/v1/orders/{order_id}/timeline/reconstruct",
         headers={"Idempotency-Key": f"recon-api-key-{uuid.uuid4().hex[:8]}"},
     )
@@ -606,7 +606,7 @@ def test_api_endpoints(client, seed_timeline_order):
     assert data_post["job_id"] is not None
 
     # 3. POST /api/v1/orders/{id}/timeline/reconstruct (async mode)
-    res_async = client.post(
+    res_async = auth_client.post(
         f"/api/v1/orders/{order_id}/timeline/reconstruct",
         json={"async": True},
         headers={"Idempotency-Key": f"recon-api-async-{uuid.uuid4().hex[:8]}"},
@@ -617,25 +617,25 @@ def test_api_endpoints(client, seed_timeline_order):
     queued_job_id = async_data["job_id"]
 
     # 4. GET /api/v1/analysis-jobs/{job_id}
-    res_job = client.get(f"/api/v1/analysis-jobs/{queued_job_id}")
+    res_job = auth_client.get(f"/api/v1/analysis-jobs/{queued_job_id}")
     assert res_job.status_code == 200
     job_data = res_job.get_json()["data"]
     assert job_data["job_id"] == queued_job_id
     assert job_data["job_type"] == "TIMELINE_RECONSTRUCTION"
 
     # 5. GET /api/v1/orders/{id}/analysis-jobs
-    res_order_jobs = client.get(f"/api/v1/orders/{order_id}/analysis-jobs")
+    res_order_jobs = auth_client.get(f"/api/v1/orders/{order_id}/analysis-jobs")
     assert res_order_jobs.status_code == 200
     jobs_list = res_order_jobs.get_json()["data"]["jobs"]
     assert len(jobs_list) >= 2
 
     # 6. Nonexistent order -> 404 ORDER_NOT_FOUND
-    res_404 = client.get("/api/v1/orders/99999999/timeline")
+    res_404 = auth_client.get("/api/v1/orders/99999999/timeline")
     assert res_404.status_code == 404
     assert res_404.get_json()["error"]["code"] == "ORDER_NOT_FOUND"
 
     # 7. Nonexistent job -> 404 RESOURCE_NOT_FOUND
-    res_job_404 = client.get("/api/v1/analysis-jobs/99999999")
+    res_job_404 = auth_client.get("/api/v1/analysis-jobs/99999999")
     assert res_job_404.status_code == 404
     assert res_job_404.get_json()["error"]["code"] == "RESOURCE_NOT_FOUND"
 

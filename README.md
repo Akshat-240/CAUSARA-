@@ -18,6 +18,16 @@ Visual stage progression with planned vs. actual duration calculations and chron
 
 ![Causara Order Timeline](docs/assets/order-timeline.png)
 
+### Workspace Authentication & Role Selection
+Porcelain & Terracotta Design System 1.0 sign-in and registration supporting multi-role workspace access:
+
+![Causara Workspace Authentication](docs/assets/auth-workspace.png)
+
+### Outcome Verification & Prediction Error Audit
+Side-by-side reconciliation of contractual SLA commitments, counterfactual forecasts, and empirically observed delivery POD timestamps:
+
+![Causara Outcome Verification](docs/assets/outcome-verification.png)
+
 ---
 
 ## The Problem Causara Solves
@@ -54,6 +64,7 @@ Causara separates data into strict epistemological categories to prevent correla
 7. **Counterfactual Scenario Simulation**: Simulates alternative remediation scenarios, comparing predicted time saved, financial costs, risk ratings, and model confidence scores.
 8. **Operational Decision Workflow**: Captures seller remediation proposals with documented rationales and enforces human-in-the-loop approval workflows for operations managers.
 9. **Outcome Verification Engine**: Benchmarks executed decisions against actual delivery events to compute prediction variance, ensuring complete closed-loop feedback.
+10. **Authentication & Backend-Enforced RBAC**: Secures workspace endpoints with salted `scrypt` password hashing, HMAC-SHA256 signed `Bearer` tokens, server-side role enforcement (`SELLER`, `CUSTOMER`, `ANALYST`, `MANAGER`, `AUDITOR`, `ADMIN`), and authenticated-principal audit attribution.
 
 ---
 
@@ -62,13 +73,14 @@ Causara separates data into strict epistemological categories to prevent correla
 ```mermaid
 flowchart TD
     subgraph Client["Frontend Layer (React 18 + TypeScript + Vite)"]
-        UI["SPA Workspace\n(Overview, Orders, Timeline, Evidence, Analysis,\nInterventions, Scenarios, Decisions, Verification)"]
-        ApiClient["Typed API Client\n(fetch wrapper, standard envelopes, safe formatters)"]
+        UI["SPA Workspace (Porcelain & Terracotta 1.0)\n(Auth, Overview, Orders, Timeline, Evidence, Analysis,\nInterventions, Scenarios, Decisions, Verification)"]
+        ApiClient["Typed API Client\n(Bearer Token Auth, 401 Session Handling, Envelopes)"]
         UI --> ApiClient
     end
 
-    subgraph Server["Backend REST API (Python 3.14 + Flask)"]
-        Routes["API Blueprints\n(/api/v1/health, orders, events, timeline,\nevidence, delay, scenarios, decisions)"]
+    subgraph Server["Backend REST API (Python 3.12+ / Flask)"]
+        Security["Security Layer (app/security.py)\nHMAC-SHA256 Tokens, RBAC Decorators,\nTrusted Principal Attribution, Security Headers"]
+        Routes["API Blueprints (/api/v1)\n(auth, health, users, orders, events, timeline,\nevidence, delay, scenarios, decisions, outbox)"]
 
         subgraph DomainServices["Core Domain Services"]
             OrderSvc["OrderService"]
@@ -90,23 +102,63 @@ flowchart TD
             ScenarioRepo["ScenarioRepository"]
             DecisionRepo["DecisionRepository"]
             OutboxRepo["OutboxRepository"]
+            UserRepo["UserRepository"]
         end
+
+        Security --> Routes
+        Routes --> DomainServices
+        DomainServices --> Repositories
     end
 
-    subgraph DataStore["Data & Persistence Layer"]
-        SQL["Microsoft SQL Server / Azure SQL\n(18 tables in 3NF, triggers, views, stored procedures)"]
+    subgraph DataStore["Polyglot Data & Persistence Layer"]
+        SQL["Azure SQL Database / SQL Server\n(18 tables in 3NF, triggers, views, stored procedures)"]
+        Cosmos["Azure Cosmos DB\n(Counterfactual Scenario Documents)"]
         StorageLocal["Local Storage Provider\n(storage/evidence/)"]
         StorageAzure["Azure Blob Storage Provider\n(azure-storage-blob)"]
     end
 
-    ApiClient -->|HTTP JSON / Multipart| Routes
-    Routes --> DomainServices
-    DomainServices --> Repositories
-    Repositories -->|pyodbc / parameterized SQL| SQL
-    EvidenceSvc -->|Local I/O| StorageLocal
-    EvidenceSvc -.->|Cloud Blob SDK| StorageAzure
-    OutboxProc -->|UPDLOCK, READPAST| SQL
+    ApiClient -->|"HTTPS JSON / Multipart + Bearer Token"| Security
+    Repositories -->|"pyodbc / Parameterized T-SQL"| SQL
+    ScenarioSvc -.->|"Simulation Docs"| Cosmos
+    EvidenceSvc -->|"Local I/O"| StorageLocal
+    EvidenceSvc -.->|"Cloud Blob SDK"| StorageAzure
+    OutboxProc -->|"UPDLOCK, READPAST"| SQL
 ```
+
+---
+
+## Cloud & Deployment Architecture
+
+Causara is deployed with a decoupled static SPA frontend and containerized WSGI backend connected to managed Azure data services:
+
+```mermaid
+flowchart LR
+    User(["Browser Client"]) -->|"HTTPS"| RenderUI["Render Static Site\ncausara-fronted.onrender.com\n(Vite Production Bundle + SPA Redirects)"]
+    RenderUI -->|"HTTPS REST API\n(CORS + Bearer JWT/HMAC)"| RenderAPI["Render Docker Web Service\ncausara-backend.onrender.com\n(Python 3.12-slim + Gunicorn + msodbcsql18)"]
+
+    RenderAPI -->|"ODBC Driver 18 (TLS)"| AzureSQL[("Azure SQL Database\ncausara-sql / causara-db\nTransactional Source of Truth")]
+    RenderAPI -->|"HTTPS SDK"| AzureCosmos[("Azure Cosmos DB\nScenario Simulation Documents")]
+    RenderAPI -->|"HTTPS SDK"| AzureBlob[("Azure Blob Storage\nEvidence Artifacts Container")]
+```
+
+---
+
+## Security & Backend-Enforced RBAC
+
+Causara enforces authentication, authorization, and input/output protections at the Flask API boundary ([`app/security.py`](app/security.py)):
+
+- **Authentication & Password Hashing**: Passwords are hashed using salted `scrypt` (`werkzeug.security`), never stored or logged in plaintext. `/auth/register` and `/auth/login` issue HMAC-SHA256 signed `v1` `Bearer` tokens bound to `user_id` and authoritative database `role`. Self-registration as `ADMIN` and login role spoofing are rejected (`403`).
+- **Trusted Principal Attribution**: Sensitive mutations (`POST /orders`, `/evidence`, `/delay-analysis`, `/decisions`, `/approve`, `/reject`) derive acting user IDs strictly from the verified token (`g.current_user`), ignoring client-supplied `uploaded_by`, `creator_user_id`, `decided_by`, or `manager_user_id`.
+- **SQL Injection & XSS Defense**: All database queries use parameterized `?` placeholders via `pyodbc`. Responses enforce `application/json`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`.
+
+| Role | Permitted Operations |
+|---|---|
+| `CUSTOMER` | Read own orders (`order_id`), timelines, delay reports, and evidence. |
+| `SELLER` | Create orders for own `seller_id`, ingest events, reconstruct timelines, upload evidence, read case records. |
+| `ANALYST` | Run delay analysis, simulate counterfactual scenarios, record decisions, verify outcomes, upload evidence. |
+| `MANAGER` | All `ANALYST` + `SELLER` operations plus exclusive approval/rejection of operational decisions (`/approve`, `/reject`). |
+| `AUDITOR` | Read-only audit across orders/cases/evidence and empirical outcome verification (`/verify`). |
+| `SYSTEM` | Automated event ingestion & timeline reconstruction via `X-Internal-API-Key` (`INTERNAL_API_KEY`). |
 
 ---
 
@@ -241,7 +293,7 @@ Developers can configure Causara to connect to an Azure SQL Database instance:
    ```
 
 > [!NOTE]
-> Azure SQL connection handling, parameterized queries, and T-SQL compatibility are implemented in code. However, a live cloud deployment of Azure SQL has not yet been verified in production staging. Causara currently runs locally.
+> Azure SQL Database connectivity, schema migrations, parameterized T-SQL queries, and end-to-end integration tests are verified against Azure SQL. For local development without cloud storage credentials, `LocalStorageProvider` (`STORAGE_PROVIDER=local`) is used.
 
 ---
 
@@ -269,12 +321,15 @@ The Flask backend exposes RESTful endpoints under `/api/v1`. Comprehensive paylo
 
 | Endpoint Group | Method | Path | Description |
 |---|---|---|---|
+| **Auth** | `POST` | `/api/v1/auth/register` | Register an operational user account with salted password hashing and signed token. |
+| | `POST` | `/api/v1/auth/login` | Authenticate user credentials and issue a signed `Bearer` access token. |
+| | `GET` | `/api/v1/auth/me` | Retrieve the authenticated principal's profile and authoritative role. |
 | **Health** | `GET` | `/api/v1/health` | Service status, API version, and live database ping. |
 | **Orders** | `GET` | `/api/v1/orders` | Paginated catalog with seller, customer, and status filtering. |
-| | `POST` | `/api/v1/orders` | Ingest a new order with auto-generated fulfillment stages. |
+| | `POST` | `/api/v1/orders` | Ingest a new order with auto-generated fulfillment stages (`SELLER`, `MANAGER`, `ADMIN`). |
 | | `GET` | `/api/v1/orders/{id}` | Detailed order metadata and stage progression. |
 | | `GET` | `/api/v1/orders/stats` | High-level fulfillment counts and active case metrics. |
-| **Events** | `POST` | `/api/v1/events` | Ingest chronological logistics events with idempotency keys. |
+| **Events** | `POST` | `/api/v1/orders/{id}/events` | Ingest chronological logistics events with idempotency keys. |
 | **Timeline** | `GET` | `/api/v1/orders/{id}/timeline` | Reconstructed chronological event log with SLA metrics. |
 | | `POST` | `/api/v1/orders/{id}/timeline/reconstruct` | Trigger explicit timeline reconstruction job. |
 | **Evidence** | `POST` | `/api/v1/orders/{id}/evidence` | Register evidence metadata or upload file attachments. |
@@ -283,12 +338,12 @@ The Flask backend exposes RESTful endpoints under `/api/v1`. Comprehensive paylo
 | **Delay Analysis** | `GET` | `/api/v1/orders/{id}/delay-analysis` | Bottleneck stage diagnostics and epistemological breakdown. |
 | **Interventions** | `GET` | `/api/v1/cases/{case_id}/interventions` | Retrieve discovered candidate interventions for an open case. |
 | **Scenarios** | `GET` | `/api/v1/cases/{case_id}/scenarios` | List simulated counterfactual scenarios. |
-| | `POST` | `/api/v1/cases/{case_id}/scenarios` | Simulate a new intervention scenario. |
+| | `POST` | `/api/v1/cases/{case_id}/scenarios` | Simulate a new intervention scenario (`ANALYST`, `MANAGER`, `ADMIN`). |
 | **Decisions** | `GET` | `/api/v1/cases/{case_id}/decisions` | List recorded operational intervention decisions. |
-| | `POST` | `/api/v1/cases/{case_id}/decisions` | Record a decision to execute an intervention scenario. |
-| | `POST` | `/api/v1/decisions/{id}/approve` | Operations Manager approval or rejection of a decision. |
-| **Verification** | `GET` | `/api/v1/decisions/{id}/verification` | Retrieve outcome verification and error deltas. |
-| | `POST` | `/api/v1/decisions/{id}/verification` | Record actual delivery outcome and compute prediction error. |
+| | `POST` | `/api/v1/cases/{case_id}/decisions` | Record a decision to execute an intervention scenario (`ANALYST`, `MANAGER`, `ADMIN`). |
+| | `POST` | `/api/v1/decisions/{id}/approve` | Operations Manager approval of a pending decision (`MANAGER`, `ADMIN`). |
+| **Verification** | `GET` | `/api/v1/decisions/{id}/verification` | Retrieve outcome verification, error deltas, or explicit unverified state. |
+| | `POST` | `/api/v1/decisions/{id}/verify` | Record actual delivery outcome and compute prediction error (`ANALYST`, `MANAGER`, `AUDITOR`, `ADMIN`). |
 
 ---
 
@@ -298,13 +353,13 @@ The Flask backend exposes RESTful endpoints under `/api/v1`. Comprehensive paylo
 ```powershell
 pytest tests/ -v
 ```
-*Current test suite: **121 passed** across database constraints, transactions, outbox concurrency, delay graph analysis, evidence validation, and API routes.*
+*Current test suite: **143 passed** across authentication, backend-enforced RBAC, security hardening, business logic, database constraints, transactions, outbox concurrency, delay graph analysis, evidence validation, and API routes.*
 
 ### Run Frontend Test Suite (Vitest)
 ```powershell
 npm test --prefix frontend -- --run
 ```
-*Current test suite: **12 passed** across safe numeric formatters, fallback handlers, and application rendering.*
+*Current test suite: **83 passed** across 14 test files covering authenticated API client behavior, safe numeric formatters, theme context, and all nine application modules.*
 
 ### Verify Frontend Production Build
 ```powershell
@@ -322,13 +377,12 @@ flake8 app database tests --max-line-length=120
 
 ## Important Project Limitations
 
-To maintain transparency, the following items are acknowledged as intentionally scoped for post-MVP delivery:
+To maintain transparency, the following items are acknowledged as current architectural boundaries or pending post-release enhancements:
 
-1. **User Authentication & Role-Based Access Control (RBAC)**: Currently, the application operates in demonstration mode using an Actor Switcher dropdown. JWT issuance, refresh tokens, and server-side RBAC enforcement are documented in the [Deferred Work Checklist](docs/DEFERRED-WORK-CHECKLIST.md) (Milestone M3).
-2. **Live Cloud Staging**: Connection abstractions for Azure SQL and Azure Blob Storage are implemented and tested with unit mocks, but a live cloud environment has not been provisioned.
-3. **Local Evidence Storage**: In local development, uploaded files are stored on the local disk under `storage/evidence/`. When deployed to ephemeral cloud containers, an external storage account (e.g. Azure Blob Storage) must be configured.
-4. **Outbox Processor Background Daemon**: The transactional outbox engine (`OutboxProcessor`) is fully implemented with atomic leases (`UPDLOCK, READPAST`) and retry backoffs, but runs on-demand or via tests rather than a standalone continuous background daemon.
-5. **Machine Learning Models**: Delays and variances are currently calculated using deterministic rule engines and historical baseline comparisons; trained regression/GBDT models are planned for future milestones.
+1. **Evidence Blob Direct Download Proxy**: Uploaded evidence artifacts stored in private Azure Blob Storage containers require a backend SAS URL or download proxy endpoint for browser retrieval when public container access is disabled.
+2. **Local Evidence Storage**: In local development (`STORAGE_PROVIDER=local`), uploaded files are stored on local disk under `storage/evidence/`. Cloud deployments use Azure Blob Storage.
+3. **Outbox Processor Background Daemon**: The transactional outbox engine (`OutboxProcessor`) is fully implemented with atomic leases (`UPDLOCK, READPAST`) and retry backoffs, and runs on-demand or via tests rather than a standalone continuous background daemon.
+4. **Machine Learning Models**: Delays and variances are currently calculated using deterministic rule engines and historical baseline comparisons; trained regression/GBDT models are planned for future iterations.
 
 For a comprehensive inventory of planned enhancements, refer to [docs/DEFERRED-WORK-CHECKLIST.md](docs/DEFERRED-WORK-CHECKLIST.md).
 

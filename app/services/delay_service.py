@@ -227,10 +227,17 @@ class DelayAnalysisService:
             # Sum observable variances
             overall_delivery_variance = sum(m.variance_minutes for m in stage_metrics if m.variance_minutes is not None)
 
-        is_order_delayed = bool(
-            (overall_delivery_variance and overall_delivery_variance > 0)
-            or any(m.is_delayed for m in stage_metrics)
-        )
+        if (
+            reconstructed.order_status == "DELIVERED"
+            and overall_delivery_variance is not None
+            and overall_delivery_variance <= 0
+        ):
+            is_order_delayed = False
+        else:
+            is_order_delayed = bool(
+                (overall_delivery_variance and overall_delivery_variance > 0)
+                or any(m.is_delayed for m in stage_metrics)
+            )
 
         # Identify primary delayed stage (maximum excess duration)
         delayed_stages = [m for m in stage_metrics if m.excess_duration_minutes > 0]
@@ -240,7 +247,7 @@ class DelayAnalysisService:
             else None
         )
 
-        # 3. Create or fetch decision case if persisting edges
+        # 3. Create or fetch decision case if persisting edges, otherwise reuse existing case
         case_id: Optional[int] = None
         case_creator = creator_user_id or int(order.get("customer_user_id") or 1)
 
@@ -251,15 +258,20 @@ class DelayAnalysisService:
                 case_title=f"Delay Investigation for Order #{order_id}",
             )
             case_id = int(case_record["case_id"])
+        else:
+            existing_case = self.delay_repo.get_latest_case_for_order(order_id)
+            if existing_case and existing_case.get("case_id") is not None:
+                case_id = int(existing_case["case_id"])
 
         # 4. Construct Delay Graph Edges
         graph_edges: List[DelayGraphEdge] = []
         valid_stages_with_ids = [m for m in stage_metrics if m.stage_id > 0]
 
-        # Stage Transition Edges (Sequential Handover - FACT)
+        # Stage Transition Edges (FACT only when both stages have executed; otherwise ESTIMATE)
         for i in range(len(valid_stages_with_ids) - 1):
             curr_s = valid_stages_with_ids[i]
             next_s = valid_stages_with_ids[i + 1]
+            is_observed_handover = curr_s.status != "PENDING" and next_s.status != "PENDING"
 
             edge_expl = f"Handover from stage '{curr_s.stage_code}' to '{next_s.stage_code}'."
             graph_edges.append(
@@ -271,7 +283,7 @@ class DelayAnalysisService:
                     to_stage_id=next_s.stage_id,
                     to_stage_code=next_s.stage_code,
                     edge_type="STAGE_TRANSITION",
-                    evidence_class="FACT",
+                    evidence_class="FACT" if is_observed_handover else "ESTIMATE",
                     estimated_delay_minutes=curr_s.excess_duration_minutes if curr_s.is_delayed else 0,
                     explanation=edge_expl,
                 )

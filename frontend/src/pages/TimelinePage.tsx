@@ -153,10 +153,16 @@ export const TimelinePage: React.FC<TimelinePageProps> = ({ initialOrderId, onNa
   }, [evidenceList]);
 
   // Formatters
+  const parseUtcDate = (dateStr: string): Date => {
+    const trimmed = dateStr.trim();
+    const hasZone = /([zZ]|[+-]\d{2}:\d{2})$/.test(trimmed);
+    return new Date(hasZone ? trimmed : `${trimmed}Z`);
+  };
+
   const formatShortDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '—';
     try {
-      return new Date(dateStr).toLocaleDateString(undefined, {
+      return parseUtcDate(dateStr).toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -169,7 +175,7 @@ export const TimelinePage: React.FC<TimelinePageProps> = ({ initialOrderId, onNa
   const formatDateTime = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '—';
     try {
-      return new Date(dateStr).toLocaleString(undefined, {
+      return parseUtcDate(dateStr).toLocaleString(undefined, {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',

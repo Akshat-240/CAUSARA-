@@ -206,6 +206,10 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
     return decisions.find((d) => d.decision_id === selectedDecisionId);
   }, [decisions, selectedDecisionId]);
 
+  const canVerifyCurrentDecision =
+    currentDecision?.decision_status === 'APPROVED' ||
+    currentDecision?.decision_status === 'EXECUTED';
+
   const formatShortDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return '—';
     try {
@@ -373,8 +377,12 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
               setOutcomeNotes('');
               setIsVerifyModalOpen(true);
             }}
-            disabled={!selectedDecisionId}
-            title="Record observed delivery and verify model prediction"
+            disabled={!selectedDecisionId || !canVerifyCurrentDecision}
+            title={
+              canVerifyCurrentDecision
+                ? 'Record observed delivery and verify model prediction'
+                : 'Decision must be APPROVED or EXECUTED before outcome verification'
+            }
           >
             {verification ? 'Re-Verify Outcome' : 'Verify Outcome'}
           </Button>
@@ -765,10 +773,13 @@ export const VerificationPage: React.FC<VerificationPageProps> = ({
         >
           <div style={{ padding: '32px', textAlign: 'center' }}>
             <p style={{ color: 'var(--text-muted)', marginBottom: '16px', maxWidth: '480px', margin: '0 auto 16px auto', lineHeight: 1.5 }}>
-              This operational decision has not yet been audited against actual delivery events. Once physical proof of delivery is received, reconcile timestamps to measure model error.
+              {canVerifyCurrentDecision
+                ? 'This operational decision has not yet been audited against actual delivery events. Once physical proof of delivery is received, reconcile timestamps to measure model error.'
+                : `Decision is currently '${currentDecision.decision_status}'. Operations Manager approval (APPROVED / EXECUTED) is required prior to empirical outcome verification.`}
             </p>
             <Button
               variant="primary"
+              disabled={!canVerifyCurrentDecision}
               onClick={() => {
                 setActualDeliveryAt(new Date().toISOString().slice(0, 16));
                 setOutcomeNotes('');

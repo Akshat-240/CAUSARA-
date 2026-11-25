@@ -97,7 +97,7 @@ def seed_order():
 # ============================================================================
 # 1. Valid Event Ingestion
 # ============================================================================
-def test_valid_event_ingestion_success(client, seed_order):
+def test_valid_event_ingestion_success(auth_client, seed_order):
     """Verify that a well-formed event payload is accepted and persisted with HTTP 201."""
     order_id = seed_order["order_id"]
     idempotency_key = f"key-valid-{seed_order['uid']}-1"
@@ -111,7 +111,7 @@ def test_valid_event_ingestion_success(client, seed_order):
         "source_type": "MANUAL_DASHBOARD",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": idempotency_key},
         json=payload,
@@ -128,7 +128,7 @@ def test_valid_event_ingestion_success(client, seed_order):
     assert isinstance(body["data"]["event_id"], int)
 
 
-def test_valid_event_ingestion_with_stage_id(client, seed_order):
+def test_valid_event_ingestion_with_stage_id(auth_client, seed_order):
     """Verify that event ingestion succeeds when stage_id is provided directly."""
     order_id = seed_order["order_id"]
     idempotency_key = f"key-stageid-{seed_order['uid']}-2"
@@ -140,7 +140,7 @@ def test_valid_event_ingestion_with_stage_id(client, seed_order):
         "description": "Handed to courier driver",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": idempotency_key},
         json=payload,
@@ -152,7 +152,7 @@ def test_valid_event_ingestion_with_stage_id(client, seed_order):
     assert body["data"]["stage_id"] == seed_order["stage2_id"]
 
 
-def test_valid_event_ingestion_without_stage(client, seed_order):
+def test_valid_event_ingestion_without_stage(auth_client, seed_order):
     """Verify that events without a specific stage (general order events) are accepted with stage_id=None."""
     order_id = seed_order["order_id"]
     idempotency_key = f"key-nostage-{seed_order['uid']}-3"
@@ -163,7 +163,7 @@ def test_valid_event_ingestion_without_stage(client, seed_order):
         "description": "General operational notification",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": idempotency_key},
         json=payload,
@@ -177,7 +177,7 @@ def test_valid_event_ingestion_without_stage(client, seed_order):
 # ============================================================================
 # 2. Validation Failures: Missing Required Fields
 # ============================================================================
-def test_ingest_event_missing_idempotency_key(client, seed_order):
+def test_ingest_event_missing_idempotency_key(auth_client, seed_order):
     """Verify that missing idempotency key returns HTTP 400 MISSING_IDEMPOTENCY_KEY."""
     order_id = seed_order["order_id"]
     payload = {
@@ -185,21 +185,21 @@ def test_ingest_event_missing_idempotency_key(client, seed_order):
         "occurred_at": "2026-11-04T10:00:00Z",
     }
 
-    response = client.post(f"/api/v1/orders/{order_id}/events", json=payload)
+    response = auth_client.post(f"/api/v1/orders/{order_id}/events", json=payload)
     assert response.status_code == 400
     body = response.get_json()
     assert body["success"] is False
     assert body["error"]["code"] == "MISSING_IDEMPOTENCY_KEY"
 
 
-def test_ingest_event_missing_event_type(client, seed_order):
+def test_ingest_event_missing_event_type(auth_client, seed_order):
     """Verify that missing event_type returns HTTP 400 MISSING_REQUIRED_FIELD."""
     order_id = seed_order["order_id"]
     payload = {
         "occurred_at": "2026-11-04T10:00:00Z",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": "key-missing-type"},
         json=payload,
@@ -209,14 +209,14 @@ def test_ingest_event_missing_event_type(client, seed_order):
     assert body["error"]["code"] == "MISSING_REQUIRED_FIELD"
 
 
-def test_ingest_event_missing_occurred_at(client, seed_order):
+def test_ingest_event_missing_occurred_at(auth_client, seed_order):
     """Verify that missing occurred_at returns HTTP 400 MISSING_REQUIRED_FIELD."""
     order_id = seed_order["order_id"]
     payload = {
         "event_type": "DISPATCHED",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": "key-missing-occurred"},
         json=payload,
@@ -229,7 +229,7 @@ def test_ingest_event_missing_occurred_at(client, seed_order):
 # ============================================================================
 # 3. Validation Failures: Nonexistent Order or Stage
 # ============================================================================
-def test_ingest_event_nonexistent_order(client):
+def test_ingest_event_nonexistent_order(auth_client):
     """Verify that attempting to ingest an event on an unknown order_id returns HTTP 404."""
     nonexistent_order_id = 999999999
     payload = {
@@ -237,7 +237,7 @@ def test_ingest_event_nonexistent_order(client):
         "occurred_at": "2026-11-04T10:00:00Z",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{nonexistent_order_id}/events",
         headers={"Idempotency-Key": "key-nonexistent-order"},
         json=payload,
@@ -247,7 +247,7 @@ def test_ingest_event_nonexistent_order(client):
     assert body["error"]["code"] == "ORDER_NOT_FOUND"
 
 
-def test_ingest_event_stage_belonging_to_different_order(client, seed_order):
+def test_ingest_event_stage_belonging_to_different_order(auth_client, seed_order):
     """Verify that referencing a stage from a different order returns HTTP 400 STAGE_ORDER_MISMATCH."""
     order1_id = seed_order["order_id"]
     arbitrary_foreign_stage_id = 999999998
@@ -258,7 +258,7 @@ def test_ingest_event_stage_belonging_to_different_order(client, seed_order):
         "occurred_at": "2026-11-04T10:00:00Z",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order1_id}/events",
         headers={"Idempotency-Key": "key-foreign-stage"},
         json=payload,
@@ -268,7 +268,7 @@ def test_ingest_event_stage_belonging_to_different_order(client, seed_order):
     assert body["error"]["code"] == "STAGE_ORDER_MISMATCH"
 
 
-def test_ingest_event_unknown_stage_code(client, seed_order):
+def test_ingest_event_unknown_stage_code(auth_client, seed_order):
     """Verify that an unknown stage_code returns HTTP 404 STAGE_NOT_FOUND."""
     order_id = seed_order["order_id"]
     payload = {
@@ -277,7 +277,7 @@ def test_ingest_event_unknown_stage_code(client, seed_order):
         "occurred_at": "2026-11-04T10:00:00Z",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": "key-bad-stage-code"},
         json=payload,
@@ -290,7 +290,7 @@ def test_ingest_event_unknown_stage_code(client, seed_order):
 # ============================================================================
 # 4. Validation Failures: Timestamps and Enums
 # ============================================================================
-def test_ingest_event_invalid_timestamp_format(client, seed_order):
+def test_ingest_event_invalid_timestamp_format(auth_client, seed_order):
     """Verify that an unparseable timestamp returns HTTP 400 INVALID_EVENT_TIMESTAMP."""
     order_id = seed_order["order_id"]
     payload = {
@@ -298,7 +298,7 @@ def test_ingest_event_invalid_timestamp_format(client, seed_order):
         "occurred_at": "not-a-timestamp",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": "key-bad-timestamp"},
         json=payload,
@@ -308,7 +308,7 @@ def test_ingest_event_invalid_timestamp_format(client, seed_order):
     assert body["error"]["code"] == "INVALID_EVENT_TIMESTAMP"
 
 
-def test_ingest_event_future_timestamp(client, seed_order):
+def test_ingest_event_future_timestamp(auth_client, seed_order):
     """Verify that an event timestamp far in the future is rejected with HTTP 400."""
     order_id = seed_order["order_id"]
     future_time = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
@@ -317,7 +317,7 @@ def test_ingest_event_future_timestamp(client, seed_order):
         "occurred_at": future_time,
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": "key-future-time"},
         json=payload,
@@ -327,7 +327,7 @@ def test_ingest_event_future_timestamp(client, seed_order):
     assert body["error"]["code"] == "INVALID_EVENT_TIMESTAMP"
 
 
-def test_ingest_event_invalid_event_type(client, seed_order):
+def test_ingest_event_invalid_event_type(auth_client, seed_order):
     """Verify that an invalid event_type (special characters or too short) is rejected."""
     order_id = seed_order["order_id"]
     payload = {
@@ -335,7 +335,7 @@ def test_ingest_event_invalid_event_type(client, seed_order):
         "occurred_at": "2026-11-04T10:00:00Z",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": "key-bad-type"},
         json=payload,
@@ -345,7 +345,7 @@ def test_ingest_event_invalid_event_type(client, seed_order):
     assert body["error"]["code"] == "INVALID_EVENT_TYPE"
 
 
-def test_ingest_event_invalid_source_type(client, seed_order):
+def test_ingest_event_invalid_source_type(auth_client, seed_order):
     """Verify that an unrecognized source_type is rejected with HTTP 400."""
     order_id = seed_order["order_id"]
     payload = {
@@ -354,7 +354,7 @@ def test_ingest_event_invalid_source_type(client, seed_order):
         "source_type": "UNAPPROVED_SOURCE",
     }
 
-    response = client.post(
+    response = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": "key-bad-source"},
         json=payload,
@@ -367,7 +367,7 @@ def test_ingest_event_invalid_source_type(client, seed_order):
 # ============================================================================
 # 5. Idempotency and Conflict Detection
 # ============================================================================
-def test_idempotent_duplicate_replay(client, seed_order):
+def test_idempotent_duplicate_replay(auth_client, seed_order):
     """Verify that resubmitting identical payload with same key returns HTTP 200 without creating duplicates."""
     order_id = seed_order["order_id"]
     idempotency_key = f"key-idempotent-{seed_order['uid']}"
@@ -381,7 +381,7 @@ def test_idempotent_duplicate_replay(client, seed_order):
     }
 
     # First request -> 201 Created
-    res1 = client.post(
+    res1 = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": idempotency_key},
         json=payload,
@@ -392,7 +392,7 @@ def test_idempotent_duplicate_replay(client, seed_order):
     assert body1["data"]["is_duplicate"] is False
 
     # Second identical request -> 200 OK replay
-    res2 = client.post(
+    res2 = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": idempotency_key},
         json=payload,
@@ -409,7 +409,7 @@ def test_idempotent_duplicate_replay(client, seed_order):
         assert cur.fetchone()[0] == 1
 
 
-def test_idempotency_conflict_rejection(client, seed_order):
+def test_idempotency_conflict_rejection(auth_client, seed_order):
     """Verify that reusing the same key with conflicting event data raises HTTP 409 IDEMPOTENCY_CONFLICT."""
     order_id = seed_order["order_id"]
     idempotency_key = f"key-conflict-{seed_order['uid']}"
@@ -419,7 +419,7 @@ def test_idempotency_conflict_rejection(client, seed_order):
         "occurred_at": "2026-11-04T10:00:00Z",
         "description": "First scan",
     }
-    res1 = client.post(
+    res1 = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": idempotency_key},
         json=payload1,
@@ -432,7 +432,7 @@ def test_idempotency_conflict_rejection(client, seed_order):
         "occurred_at": "2026-11-04T10:00:00Z",
         "description": "Conflict attempt",
     }
-    res2 = client.post(
+    res2 = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": idempotency_key},
         json=payload2,
@@ -476,34 +476,34 @@ def test_transaction_rollback_on_database_failure(seed_order, monkeypatch):
 # ============================================================================
 # 7. Timeline Retrieval & History Preservation
 # ============================================================================
-def test_multiple_events_chronological_timeline(client, seed_order):
+def test_multiple_events_chronological_timeline(auth_client, seed_order):
     """Verify that multiple events ingested in arbitrary order are sorted strictly by physical occurred_at."""
     order_id = seed_order["order_id"]
     uid = seed_order["uid"]
 
     # Ingest event 3 (DISPATCHED)
-    client.post(
+    auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": f"multi-{uid}-3"},
         json={"event_type": "DISPATCHED", "occurred_at": "2026-11-02T14:00:00Z"},
     )
 
     # Ingest event 1 (ORDER_PLACED - earlier time)
-    client.post(
+    auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": f"multi-{uid}-1"},
         json={"event_type": "ORDER_PLACED", "occurred_at": "2026-11-01T08:00:00Z"},
     )
 
     # Ingest event 2 (PACKED - middle time)
-    client.post(
+    auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": f"multi-{uid}-2"},
         json={"event_type": "PACKED", "occurred_at": "2026-11-01T15:00:00Z"},
     )
 
     # Query GET timeline
-    response = client.get(f"/api/v1/orders/{order_id}/events")
+    response = auth_client.get(f"/api/v1/orders/{order_id}/events")
     assert response.status_code == 200
     body = response.get_json()
     assert body["success"] is True
@@ -513,13 +513,13 @@ def test_multiple_events_chronological_timeline(client, seed_order):
     assert event_types == ["ORDER_PLACED", "PACKED", "DISPATCHED"]
 
 
-def test_preservation_of_existing_event_history(client, seed_order):
+def test_preservation_of_existing_event_history(auth_client, seed_order):
     """Verify that ingesting subsequent events preserves prior records without mutating them."""
     order_id = seed_order["order_id"]
     uid = seed_order["uid"]
 
     # 1. Ingest initial event
-    res1 = client.post(
+    res1 = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": f"hist-{uid}-1"},
         json={
@@ -531,7 +531,7 @@ def test_preservation_of_existing_event_history(client, seed_order):
     event1_id = res1.get_json()["data"]["event_id"]
 
     # 2. Ingest second event with newer status
-    res2 = client.post(
+    res2 = auth_client.post(
         f"/api/v1/orders/{order_id}/events",
         headers={"Idempotency-Key": f"hist-{uid}-2"},
         json={

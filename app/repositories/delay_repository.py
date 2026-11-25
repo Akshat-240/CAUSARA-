@@ -38,9 +38,10 @@ class DelayRepository:
     ) -> Dict[str, Any]:
         """Retrieve existing active decision case for order or create a new one."""
         select_query = """
-            SELECT case_id, order_id, created_by, case_title, status, opened_at, closed_at
+            SELECT TOP 1 case_id, order_id, created_by, case_title, status, opened_at, closed_at
             FROM dbo.decision_cases
-            WHERE order_id = ? AND status IN ('OPEN', 'ANALYZING', 'PENDING_APPROVAL');
+            WHERE order_id = ? AND status IN ('OPEN', 'ANALYZING', 'PENDING_APPROVAL')
+            ORDER BY case_id DESC;
         """
         title = case_title or f"Delay Investigation Order #{order_id}"
         insert_query = """
@@ -73,6 +74,36 @@ class DelayRepository:
                 row = cur.fetchone()
                 managed_conn.commit()
                 return _row_to_dict(cur, row) or {}
+            finally:
+                cur.close()
+
+    def get_latest_case_for_order(
+        self,
+        order_id: int,
+        conn: Optional[pyodbc.Connection] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieve active decision case for an order, or the most recent historical case."""
+        query = """
+            SELECT TOP 1 case_id, order_id, created_by, case_title, status, opened_at, closed_at
+            FROM dbo.decision_cases
+            WHERE order_id = ?
+            ORDER BY
+                CASE WHEN status IN ('OPEN', 'ANALYZING', 'PENDING_APPROVAL') THEN 0 ELSE 1 END,
+                case_id DESC;
+        """
+        if conn is not None:
+            cur = conn.cursor()
+            try:
+                cur.execute(query, (order_id,))
+                return _row_to_dict(cur, cur.fetchone())
+            finally:
+                cur.close()
+
+        with get_db_connection() as managed_conn:
+            cur = managed_conn.cursor()
+            try:
+                cur.execute(query, (order_id,))
+                return _row_to_dict(cur, cur.fetchone())
             finally:
                 cur.close()
 

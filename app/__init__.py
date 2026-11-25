@@ -26,6 +26,11 @@ def create_app(config_name: str | None = None) -> Flask:
     config_class = get_config(config_name)
     app.config.from_object(config_class)
 
+    if app.config.get("ENV") == "production":
+        secret = app.config.get("SECRET_KEY")
+        if not secret or secret == "causara-dev-secret-key-insecure":
+            raise ValueError("SECRET_KEY must be set to a secure value in production environment.")
+
     # Configure logging
     configure_logging(app)
     app.logger.info("Initializing Causara API in %s mode", app.config.get("ENV"))
@@ -48,6 +53,10 @@ def create_app(config_name: str | None = None) -> Flask:
     def append_response_headers(response):
         if hasattr(g, "request_id"):
             response.headers["X-Request-ID"] = g.request_id
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
         return response
 
     # Centralized JSON error handling

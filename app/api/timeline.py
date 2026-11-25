@@ -3,6 +3,7 @@
 from typing import Any, Optional
 from flask import Blueprint, request
 from app.api.errors import APIError, format_success_response
+from app.security import require_auth, require_roles
 from app.services.timeline_service import TimelineService
 
 timeline_bp = Blueprint("timeline", __name__)
@@ -19,6 +20,7 @@ def _format_datetime(dt_val: Any) -> Optional[str]:
 
 
 @timeline_bp.route("/orders/<int:order_id>/timeline", methods=["GET"])
+@require_auth()
 def get_order_timeline(order_id: int):
     """Retrieve the normalized, chronological, and explainable timeline for an order.
 
@@ -35,6 +37,7 @@ def get_order_timeline(order_id: int):
 
 
 @timeline_bp.route("/orders/<int:order_id>/timeline/reconstruct", methods=["POST"])
+@require_roles("SELLER", "ANALYST", "MANAGER", "ADMIN", allow_internal_service=True)
 def reconstruct_order_timeline(order_id: int):
     """Request and execute factual timeline reconstruction for an order.
 
@@ -72,6 +75,7 @@ def reconstruct_order_timeline(order_id: int):
 
 
 @timeline_bp.route("/analysis-jobs/<int:job_id>", methods=["GET"])
+@require_auth()
 def get_analysis_job_status(job_id: int):
     """Retrieve the lifecycle state, execution timestamps, and error diagnostics of an analysis job."""
     job = _timeline_service.get_analysis_job(job_id=job_id)
@@ -100,6 +104,7 @@ def get_analysis_job_status(job_id: int):
 
 
 @timeline_bp.route("/orders/<int:order_id>/analysis-jobs", methods=["GET"])
+@require_auth()
 def list_order_analysis_jobs(order_id: int):
     """Retrieve all background analysis jobs associated with an order."""
     jobs = _timeline_service.list_order_analysis_jobs(order_id=order_id)

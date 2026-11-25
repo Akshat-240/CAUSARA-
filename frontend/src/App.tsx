@@ -3,7 +3,13 @@ import { ThemeProvider } from './context/ThemeContext';
 import { Layout } from './components/layout/Layout';
 import { NavigationTab } from './components/layout/Sidebar';
 import { DemoActor, HealthData, AuthUser } from './types/api';
-import { fetchHealth, fetchActors } from './services/api';
+import {
+  fetchHealth,
+  fetchActors,
+  setAuthToken,
+  clearAuthSession,
+  registerUnauthorizedHandler,
+} from './services/api';
 import { AuthPage } from './pages/AuthPage';
 
 // Pages
@@ -32,7 +38,14 @@ const CausaraApp: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
     try {
       const stored = localStorage.getItem('causara_user');
-      return stored ? JSON.parse(stored) : null;
+      if (!stored) return null;
+      const parsed = JSON.parse(stored) as AuthUser;
+      if (!parsed?.token) {
+        localStorage.removeItem('causara_user');
+        return null;
+      }
+      setAuthToken(parsed.token);
+      return parsed;
     } catch {
       return null;
     }
@@ -79,12 +92,32 @@ const CausaraApp: React.FC = () => {
     }
   }, []);
 
+  const handleLogout = useCallback(() => {
+    clearAuthSession();
+    setCurrentUser(null);
+    setActors([]);
+    setActiveActor(null);
+  }, []);
+
+  useEffect(() => {
+    registerUnauthorizedHandler(handleLogout);
+    return () => registerUnauthorizedHandler(null);
+  }, [handleLogout]);
+
   useEffect(() => {
     checkConnectivity();
-    loadActors();
-  }, [checkConnectivity, loadActors]);
+  }, [checkConnectivity]);
+
+  useEffect(() => {
+    if (currentUser?.token) {
+      loadActors();
+    } else {
+      setActorsLoading(false);
+    }
+  }, [currentUser, loadActors]);
 
   const handleAuthSuccess = (user: AuthUser) => {
+    setAuthToken(user.token || null);
     try {
       localStorage.setItem('causara_user', JSON.stringify(user));
     } catch {
@@ -101,15 +134,6 @@ const CausaraApp: React.FC = () => {
         setActiveActor(matched);
       }
     }
-  };
-
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem('causara_user');
-    } catch {
-      // ignore
-    }
-    setCurrentUser(null);
   };
 
   const handleNavigate = (

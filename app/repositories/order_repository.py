@@ -298,8 +298,19 @@ class OrderRepository:
                     'PLACED', 'PROCESSING', 'DISPATCHED', 'IN_TRANSIT'
                 ) THEN 1 ELSE 0 END), 0) AS active_orders,
                 ISNULL(SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS cancelled_orders,
-                ISNULL(SUM(CASE WHEN status = 'DELAYED' THEN 1 ELSE 0 END), 0) AS delayed_orders,
-                (SELECT COUNT(*) FROM dbo.decision_cases WHERE status = 'OPEN') AS open_cases_count
+                (
+                    SELECT COUNT(*) FROM dbo.orders o
+                    WHERE o.status = 'DELAYED'
+                       OR EXISTS (
+                           SELECT 1 FROM dbo.decision_cases dc
+                           WHERE dc.order_id = o.order_id
+                             AND dc.status IN ('OPEN', 'ANALYZING', 'PENDING_APPROVAL')
+                       )
+                ) AS delayed_orders,
+                (
+                    SELECT COUNT(*) FROM dbo.decision_cases
+                    WHERE status IN ('OPEN', 'ANALYZING', 'PENDING_APPROVAL')
+                ) AS open_cases_count
             FROM dbo.orders;
         """
         if conn is not None:

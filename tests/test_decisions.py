@@ -216,7 +216,7 @@ def test_outcome_verification_and_variance_calculation(seed_decision_env):
     assert verification["delivery_variance_minutes"] == -240  # 4h early vs original SLA
 
 
-def test_decisions_api_endpoints(client, seed_decision_env):
+def test_decisions_api_endpoints(auth_client, seed_decision_env):
     """Test decisions REST API endpoints."""
     case_id = seed_decision_env["case_id"]
     scenario_id = seed_decision_env["scenario_id"]
@@ -225,7 +225,7 @@ def test_decisions_api_endpoints(client, seed_decision_env):
     expected_delivery = seed_decision_env["expected_delivery_at"]
 
     # 1. POST /cases/<case_id>/decisions
-    res_record = client.post(
+    res_record = auth_client.post(
         f"/api/v1/cases/{case_id}/decisions",
         json={
             "scenario_id": scenario_id,
@@ -240,12 +240,12 @@ def test_decisions_api_endpoints(client, seed_decision_env):
     assert dec_data["decision_status"] == "PENDING"
 
     # 2. GET /decisions/<id>
-    res_get = client.get(f"/api/v1/decisions/{decision_id}")
+    res_get = auth_client.get(f"/api/v1/decisions/{decision_id}")
     assert res_get.status_code == 200
     assert res_get.get_json()["data"]["decision_id"] == decision_id
 
     # 3. POST /decisions/<id>/approve
-    res_app = client.post(
+    res_app = auth_client.post(
         f"/api/v1/decisions/{decision_id}/approve",
         json={"manager_user_id": manager_id},
     )
@@ -254,7 +254,7 @@ def test_decisions_api_endpoints(client, seed_decision_env):
 
     # 4. POST /decisions/<id>/verify
     actual_dt_str = (expected_delivery - timedelta(hours=3)).isoformat()
-    res_ver = client.post(
+    res_ver = auth_client.post(
         f"/api/v1/decisions/{decision_id}/verify",
         json={
             "actual_delivery_at": actual_dt_str,
@@ -267,6 +267,6 @@ def test_decisions_api_endpoints(client, seed_decision_env):
     assert ver_data["signed_prediction_error_minutes"] is not None
 
     # 5. GET /decisions/<id>/verification
-    res_get_ver = client.get(f"/api/v1/decisions/{decision_id}/verification")
+    res_get_ver = auth_client.get(f"/api/v1/decisions/{decision_id}/verification")
     assert res_get_ver.status_code == 200
     assert res_get_ver.get_json()["data"]["decision_id"] == decision_id

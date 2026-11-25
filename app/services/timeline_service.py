@@ -845,7 +845,16 @@ class TimelineService:
             if not e.is_duplicate and not e.is_conflict
         )
         if (delivered_stage and delivered_stage.status == "COMPLETED") or has_delivery or actual_delivery_at_str:
-            time_str = actual_delivery_at_str or "recently"
+            time_str = "recently"
+            if actual_delivery_at_str:
+                try:
+                    dt = parse_to_utc_datetime(actual_delivery_at_str)
+                    if dt:
+                        time_str = dt.strftime("%b %d, %Y at %I:%M %p UTC")
+                    else:
+                        time_str = actual_delivery_at_str
+                except Exception:
+                    time_str = actual_delivery_at_str
             return f"Your package was successfully delivered on {time_str}."
 
         # Identify current active stage

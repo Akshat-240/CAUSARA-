@@ -227,7 +227,7 @@ def test_delay_analysis_missing_data_warnings(seed_delay_order):
     assert any("DISPATCH" in w for w in report.missing_data_warnings)
 
 
-def test_delay_analysis_api_endpoints(client, seed_delay_order):
+def test_delay_analysis_api_endpoints(auth_client, seed_delay_order):
     """Test REST API endpoints for delay analysis and case graph retrieval."""
     order_id = seed_delay_order["order_id"]
     t0 = seed_delay_order["base_time"]
@@ -239,7 +239,7 @@ def test_delay_analysis_api_endpoints(client, seed_delay_order):
     _insert_event(order_id, stage_ids["DISPATCH"], "CARRIER_RECEIVED", t0 + timedelta(hours=22))
 
     # 1. POST /orders/<id>/delay-analysis
-    res_post = client.post(f"/api/v1/orders/{order_id}/delay-analysis", json={"persist_edges": True})
+    res_post = auth_client.post(f"/api/v1/orders/{order_id}/delay-analysis", json={"persist_edges": True})
     assert res_post.status_code == 200
     data_post = res_post.get_json()["data"]
     assert data_post["order_id"] == order_id
@@ -248,18 +248,18 @@ def test_delay_analysis_api_endpoints(client, seed_delay_order):
     assert case_id is not None
 
     # 2. GET /orders/<id>/delay-analysis
-    res_get = client.get(f"/api/v1/orders/{order_id}/delay-analysis")
+    res_get = auth_client.get(f"/api/v1/orders/{order_id}/delay-analysis")
     assert res_get.status_code == 200
     data_get = res_get.get_json()["data"]
     assert data_get["order_id"] == order_id
 
     # 3. GET /cases/<case_id>/delay-report
-    res_case_rep = client.get(f"/api/v1/cases/{case_id}/delay-report")
+    res_case_rep = auth_client.get(f"/api/v1/cases/{case_id}/delay-report")
     assert res_case_rep.status_code == 200
     assert res_case_rep.get_json()["data"]["order_id"] == order_id
 
     # 4. GET /cases/<case_id>/delay-graph
-    res_graph = client.get(f"/api/v1/cases/{case_id}/delay-graph")
+    res_graph = auth_client.get(f"/api/v1/cases/{case_id}/delay-graph")
     assert res_graph.status_code == 200
     graph_data = res_graph.get_json()["data"]
     assert graph_data["case_id"] == case_id

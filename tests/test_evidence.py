@@ -296,13 +296,13 @@ def test_list_evidence_by_stage(seed_evidence_order):
     assert stage_evidence[0]["file_name"] == "stage_receipt.png"
 
 
-def test_evidence_api_endpoints(client, seed_evidence_order):
+def test_evidence_api_endpoints(auth_client, seed_evidence_order):
     """Verify REST API endpoints for evidence upload and retrieval."""
     order_id = seed_evidence_order["order_id_1"]
     user_id = seed_evidence_order["seller_user_id"]
 
     # 1. POST JSON
-    res_json = client.post(
+    res_json = auth_client.post(
         f"/api/v1/orders/{order_id}/evidence",
         json={
             "uploaded_by": user_id,
@@ -320,7 +320,7 @@ def test_evidence_api_endpoints(client, seed_evidence_order):
         "uploaded_by": str(user_id),
         "file": (io.BytesIO(b"Sample upload test content"), "sample.txt"),
     }
-    res_file = client.post(
+    res_file = auth_client.post(
         f"/api/v1/orders/{order_id}/evidence",
         data=data,
         content_type="multipart/form-data",
@@ -328,12 +328,12 @@ def test_evidence_api_endpoints(client, seed_evidence_order):
     assert res_file.status_code == 201
 
     # 3. GET /orders/{id}/evidence
-    res_list = client.get(f"/api/v1/orders/{order_id}/evidence")
+    res_list = auth_client.get(f"/api/v1/orders/{order_id}/evidence")
     assert res_list.status_code == 200
     assert len(res_list.get_json()["data"]["evidence"]) >= 2
 
     # 4. GET /evidence/{id}
-    res_get = client.get(f"/api/v1/evidence/{evidence_id}")
+    res_get = auth_client.get(f"/api/v1/evidence/{evidence_id}")
     assert res_get.status_code == 200
     assert res_get.get_json()["data"]["file_name"] == "api_doc.pdf"
 

@@ -58,6 +58,10 @@ class InterventionService:
         # Perform deterministic delay analysis
         report = self.delay_service.analyze_order_delay(order_id, persist_edges=False)
 
+        # No operational interventions apply once a consignment is already DELIVERED or CANCELLED
+        if report.order_status in ("DELIVERED", "CANCELLED"):
+            return []
+
         # Retrieve active interventions catalogue
         active_interventions = self.scenario_repo.list_active_interventions()
         by_code = {item["intervention_code"]: item for item in active_interventions}

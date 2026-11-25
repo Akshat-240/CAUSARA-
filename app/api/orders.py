@@ -1,9 +1,10 @@
 """REST API endpoints for order entity creation, queries, and stage progression."""
 
 from typing import Any, Optional
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from app.api.errors import APIError, format_success_response
+from app.security import parse_positive_int, require_auth, require_roles, sanitize_text_input, validate_pagination
 from app.services.order_service import OrderService
 from app.services.timeline_service import parse_to_utc_datetime
 
@@ -11,11 +12,32 @@ orders_bp = Blueprint("orders", __name__)
 _order_service = OrderService()
 
 
+def _authorize_order_access(order: dict) -> None:
+    """Enforce customer and seller ownership boundaries on single-order lookups."""
+    principal = getattr(g, "current_user", None) or {}
+    role = principal.get("role")
+    if role == "CUSTOMER" and int(order["customer_user_id"]) != int(principal["user_id"]):
+        raise APIError(
+            code="FORBIDDEN",
+            message="Customers may only access their own orders.",
+            status_code=403,
+        )
+    if role == "SELLER" and principal.get("seller_id") is not None:
+        if int(order["seller_id"]) != int(principal["seller_id"]):
+            raise APIError(
+                code="FORBIDDEN",
+                message="Sellers may only access their own orders.",
+                status_code=403,
+            )
+
+
 def _format_datetime(dt_val: Any) -> Optional[str]:
-    """Convert datetime to ISO 8601 string."""
+    """Convert datetime to UTC ISO 8601 string."""
     if dt_val is None:
         return None
     if hasattr(dt_val, "isoformat"):
+        if getattr(dt_val, "tzinfo", None) is None:
+            return dt_val.isoformat() + "Z"
         return dt_val.isoformat()
     return str(dt_val)
 
@@ -41,24 +63,37 @@ def _serialize_stage(stage: dict) -> dict:
 
 
 @orders_bp.route("/orders", methods=["POST"])
+@require_roles("SELLER", "MANAGER", "ADMIN")
 def create_order():
     """Create a new order entity with planned operational stages."""
     payload = request.get_json(silent=True) or {}
-    seller_id = payload.get("seller_id")
-    customer_user_id = payload.get("customer_user_id")
-    external_order_ref = payload.get("external_order_ref")
+    raw_seller_id = payload.get("seller_id")
+    raw_customer_user_id = payload.get("customer_user_id")
+    external_order_ref = sanitize_text_input(
+        payload.get("external_order_ref"), "external_order_ref", required=True, max_length=100
+    )
     placed_at_str = payload.get("placed_at")
     expected_delivery_at_str = payload.get("expected_delivery_at")
     custom_stages = payload.get("stages")
 
-    if not seller_id:
+    if raw_seller_id is None:
         raise APIError(code="BAD_REQUEST", message="Missing 'seller_id'.", status_code=400)
-    if not customer_user_id:
+    if raw_customer_user_id is None:
         raise APIError(code="BAD_REQUEST", message="Missing 'customer_user_id'.", status_code=400)
-    if not external_order_ref:
-        raise APIError(code="BAD_REQUEST", message="Missing 'external_order_ref'.", status_code=400)
     if not expected_delivery_at_str:
         raise APIError(code="BAD_REQUEST", message="Missing 'expected_delivery_at'.", status_code=400)
+
+    seller_id = parse_positive_int(raw_seller_id, "seller_id")
+    customer_user_id = parse_positive_int(raw_customer_user_id, "customer_user_id")
+
+    principal = g.current_user
+    if principal.get("role") == "SELLER" and principal.get("seller_id") is not None:
+        if seller_id != int(principal["seller_id"]):
+            raise APIError(
+                code="FORBIDDEN",
+                message="Sellers may only create orders for their own seller account.",
+                status_code=403,
+            )
 
     placed_dt = parse_to_utc_datetime(placed_at_str) if placed_at_str else None
     expected_dt = parse_to_utc_datetime(expected_delivery_at_str)
@@ -66,9 +101,9 @@ def create_order():
         raise APIError(code="BAD_REQUEST", message="Invalid 'expected_delivery_at' timestamp format.", status_code=400)
 
     order = _order_service.create_order(
-        seller_id=int(seller_id),
-        customer_user_id=int(customer_user_id),
-        external_order_ref=str(external_order_ref),
+        seller_id=seller_id,
+        customer_user_id=customer_user_id,
+        external_order_ref=external_order_ref or "",
         placed_at=placed_dt,
         expected_delivery_at=expected_dt,
         custom_stages=custom_stages,
@@ -77,13 +112,17 @@ def create_order():
 
 
 @orders_bp.route("/orders", methods=["GET"])
+@require_auth()
 def list_orders():
     """List orders with optional status or seller filtering and pagination."""
     status = request.args.get("status")
     seller_id_str = request.args.get("seller_id")
-    seller_id = int(seller_id_str) if seller_id_str and seller_id_str.isdigit() else None
-    limit = int(request.args.get("limit", 50))
-    offset = int(request.args.get("offset", 0))
+    seller_id = parse_positive_int(seller_id_str, "seller_id") if seller_id_str else None
+    limit, offset = validate_pagination(request.args.get("limit"), request.args.get("offset"))
+
+    principal = g.current_user
+    if principal.get("role") == "SELLER" and principal.get("seller_id") is not None:
+        seller_id = int(principal["seller_id"])
 
     orders, total = _order_service.list_orders(
         status=status,
@@ -91,6 +130,10 @@ def list_orders():
         limit=limit,
         offset=offset,
     )
+    if principal.get("role") == "CUSTOMER":
+        orders = [o for o in orders if int(o["customer_user_id"]) == int(principal["user_id"])]
+        total = len(orders)
+
     return format_success_response(
         {
             "total": total,
@@ -103,15 +146,20 @@ def list_orders():
 
 
 @orders_bp.route("/orders/<int:order_id>", methods=["GET"])
+@require_auth()
 def get_order(order_id: int):
     """Retrieve full details for an order."""
     order = _order_service.get_order(order_id)
+    _authorize_order_access(order)
     return format_success_response(_serialize_order(order), status_code=200)
 
 
 @orders_bp.route("/orders/<int:order_id>/stages", methods=["GET"])
+@require_auth()
 def get_order_stages(order_id: int):
     """Retrieve operational stages for an order."""
+    order = _order_service.get_order(order_id)
+    _authorize_order_access(order)
     stages = _order_service.get_order_stages(order_id)
     return format_success_response(
         {
@@ -124,6 +172,7 @@ def get_order_stages(order_id: int):
 
 
 @orders_bp.route("/orders/stats", methods=["GET"])
+@require_auth()
 def get_order_stats():
     """Retrieve operational fulfillment metrics aggregated directly from database."""
     stats = _order_service.get_order_stats()
@@ -131,6 +180,7 @@ def get_order_stats():
 
 
 @orders_bp.route("/sellers", methods=["GET"])
+@require_auth()
 def list_sellers():
     """Retrieve list of registered sellers."""
     sellers = _order_service.list_sellers()

@@ -4,6 +4,7 @@ from typing import Any, Optional
 from flask import Blueprint, request
 
 from app.api.errors import APIError, format_success_response
+from app.security import parse_positive_int, require_auth, require_roles, sanitize_text_input
 from app.services.intervention_service import InterventionService
 from app.services.scenario_service import ScenarioService
 
@@ -30,6 +31,7 @@ def _serialize_scenario(sc: dict) -> dict:
 
 
 @scenarios_bp.route("/cases/<int:case_id>/interventions", methods=["GET"])
+@require_auth()
 def get_case_candidate_interventions(case_id: int):
     """Discover candidate operational interventions applicable to an order's delay points."""
     candidates = _intervention_service.discover_candidate_interventions(case_id)
@@ -44,16 +46,13 @@ def get_case_candidate_interventions(case_id: int):
 
 
 @scenarios_bp.route("/cases/<int:case_id>/scenarios", methods=["POST"])
+@require_roles("ANALYST", "MANAGER", "ADMIN")
 def simulate_case_scenario(case_id: int):
     """Simulate a decision scenario containing selected interventions."""
     payload = request.get_json(silent=True) or {}
-    scenario_name = payload.get("scenario_name")
-    if not scenario_name:
-        raise APIError(
-            code="BAD_REQUEST",
-            message="Missing required field 'scenario_name'.",
-            status_code=400,
-        )
+    scenario_name = sanitize_text_input(
+        payload.get("scenario_name"), "scenario_name", required=True, max_length=200
+    )
 
     intervention_ids = payload.get("intervention_ids")
     if not intervention_ids or not isinstance(intervention_ids, list):
@@ -63,13 +62,24 @@ def simulate_case_scenario(case_id: int):
             status_code=400,
         )
 
+    parsed_ids = [parse_positive_int(i, "intervention_ids[]") for i in intervention_ids]
     assumptions = payload.get("assumptions")
-    cosmos_doc_id = payload.get("cosmos_document_id")
+    if isinstance(assumptions, list):
+        assumptions = [
+            sanitize_text_input(a, "assumptions[]", required=True, max_length=500)
+            for a in assumptions
+        ]
+    elif assumptions is not None:
+        assumptions = sanitize_text_input(assumptions, "assumptions", required=False, max_length=1000)
+
+    cosmos_doc_id = sanitize_text_input(
+        payload.get("cosmos_document_id"), "cosmos_document_id", required=False, max_length=128
+    )
 
     scenario = _scenario_service.simulate_scenario(
         case_id=case_id,
-        scenario_name=scenario_name,
-        intervention_ids=[int(i) for i in intervention_ids],
+        scenario_name=scenario_name or "",
+        intervention_ids=parsed_ids,
         assumptions=assumptions,
         cosmos_document_id=cosmos_doc_id,
     )
@@ -77,6 +87,7 @@ def simulate_case_scenario(case_id: int):
 
 
 @scenarios_bp.route("/cases/<int:case_id>/scenarios/auto-generate", methods=["POST"])
+@require_roles("ANALYST", "MANAGER", "ADMIN")
 def auto_generate_scenarios(case_id: int):
     """Automatically synthesize alternative candidate scenarios for evaluation."""
     scenarios = _scenario_service.auto_generate_scenarios_for_case(case_id)
@@ -91,6 +102,7 @@ def auto_generate_scenarios(case_id: int):
 
 
 @scenarios_bp.route("/cases/<int:case_id>/scenarios", methods=["GET"])
+@require_auth()
 def list_case_scenarios(case_id: int):
     """List all simulated scenarios for a decision case."""
     scenarios = _scenario_service.list_case_scenarios(case_id)
@@ -105,6 +117,7 @@ def list_case_scenarios(case_id: int):
 
 
 @scenarios_bp.route("/scenarios/<int:scenario_id>", methods=["GET"])
+@require_auth()
 def get_scenario(scenario_id: int):
     """Retrieve details for a simulated scenario."""
     scenario = _scenario_service.get_scenario(scenario_id)

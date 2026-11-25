@@ -281,6 +281,14 @@ class EvidenceService:
                 )
 
         # 6. Storage processing
+        safe_name = os.path.basename((file_name or "").replace("\\", "/")).strip()
+        if not safe_name or safe_name in (".", ".."):
+            raise APIError(
+                code="BAD_REQUEST",
+                message="Invalid 'file_name'.",
+                status_code=400,
+            )
+
         effective_blob_uri = blob_uri
         effective_hash = sha256_hash
 
@@ -291,7 +299,7 @@ class EvidenceService:
                     message=f"File exceeds maximum allowed size of {MAX_FILE_SIZE_BYTES} bytes.",
                     status_code=413,
                 )
-            storage_meta = self.storage.store_file(order_id, file_name, file_bytes)
+            storage_meta = self.storage.store_file(order_id, safe_name, file_bytes)
             effective_blob_uri = storage_meta["blob_uri"]
             effective_hash = storage_meta["sha256_hash"]
 

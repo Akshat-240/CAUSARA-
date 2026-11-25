@@ -1,8 +1,9 @@
 """API endpoints for delay-chain reconstruction and case delay analysis."""
 
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from app.api.errors import APIError, format_success_response
+from app.security import require_auth, require_roles
 from app.services.delay_service import DelayAnalysisService
 from app.repositories.delay_repository import DelayRepository
 
@@ -12,11 +13,14 @@ _delay_repo = DelayRepository()
 
 
 @delay_bp.route("/orders/<int:order_id>/delay-analysis", methods=["POST"])
+@require_roles("ANALYST", "MANAGER", "ADMIN")
 def analyze_order_delay(order_id: int):
     """Run deterministic delay analysis for an order and persist delay graph edges."""
     payload = request.get_json(silent=True) or {}
-    creator_user_id = payload.get("creator_user_id")
     persist_edges = bool(payload.get("persist_edges", True))
+
+    # Derive acting analyst/manager strictly from authenticated principal
+    creator_user_id = int(g.current_user["user_id"])
 
     report = _delay_service.analyze_order_delay(
         order_id=order_id,
@@ -27,6 +31,7 @@ def analyze_order_delay(order_id: int):
 
 
 @delay_bp.route("/orders/<int:order_id>/delay-analysis", methods=["GET"])
+@require_auth()
 def get_order_delay_analysis(order_id: int):
     """Retrieve on-demand delay analysis report for an order without forcing new edges."""
     report = _delay_service.analyze_order_delay(
@@ -37,6 +42,7 @@ def get_order_delay_analysis(order_id: int):
 
 
 @delay_bp.route("/cases/<int:case_id>/delay-report", methods=["GET"])
+@require_auth()
 def get_case_delay_report(case_id: int):
     """Retrieve delay analysis report associated with a decision case."""
     case = _delay_repo.get_case_by_id(case_id)
@@ -56,6 +62,7 @@ def get_case_delay_report(case_id: int):
 
 
 @delay_bp.route("/cases/<int:case_id>/delay-graph", methods=["GET"])
+@require_auth()
 def get_case_delay_graph(case_id: int):
     """Retrieve persisted delay edges and causal hypotheses for a decision case."""
     graph_edges = _delay_service.get_case_delay_graph(case_id)

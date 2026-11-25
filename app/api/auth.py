@@ -1,17 +1,18 @@
 """REST API endpoints for user authentication, registration, and role management."""
 
 import re
-import uuid
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 from werkzeug.security import check_password_hash, generate_password_hash
 from app.api.errors import APIError, format_success_response
 from app.repositories.user_repository import UserRepository
+from app.security import create_access_token, require_auth, sanitize_text_input
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 _user_repo = UserRepository()
 
 EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
 VALID_ROLES = {"SELLER", "CUSTOMER", "MANAGER", "ANALYST", "AUDITOR", "ADMIN"}
+SELF_REGISTRABLE_ROLES = {"SELLER", "CUSTOMER", "MANAGER", "ANALYST", "AUDITOR"}
 
 
 @auth_bp.route("/roles", methods=["GET"])
@@ -38,28 +39,34 @@ def register():
         role (str): System role (SELLER, CUSTOMER, MANAGER, ANALYST, AUDITOR).
         business_name (str, optional): Business name if registering as SELLER.
     """
-    payload = request.get_json() or {}
-    full_name = (payload.get("full_name") or "").strip()
+    payload = request.get_json(silent=True) or {}
+    full_name = sanitize_text_input(payload.get("full_name"), "full_name", required=False, max_length=150) or ""
     email = (payload.get("email") or "").strip().lower()
     password = payload.get("password") or ""
     role = (payload.get("role") or "").strip().upper()
-    business_name = (payload.get("business_name") or "").strip() or None
+    business_name = sanitize_text_input(payload.get("business_name"), "business_name", required=False, max_length=150)
 
     # 1. Validation
     if not full_name:
         raise APIError(code="VALIDATION_ERROR", message="Full name is required.", status_code=400)
-    if not email or not EMAIL_REGEX.match(email):
+    if not email or len(email) > 255 or not EMAIL_REGEX.match(email):
         raise APIError(code="VALIDATION_ERROR", message="A valid email address is required.", status_code=400)
-    if not password or len(password) < 6:
+    if not isinstance(password, str) or len(password) < 6:
         raise APIError(
             code="VALIDATION_ERROR",
             message="Password must be at least 6 characters long.",
             status_code=400,
         )
-    if role not in VALID_ROLES:
+    if role == "ADMIN":
+        raise APIError(
+            code="FORBIDDEN",
+            message="Self-registration as ADMIN is not permitted.",
+            status_code=403,
+        )
+    if role not in SELF_REGISTRABLE_ROLES:
         raise APIError(
             code="INVALID_ROLE",
-            message=f"Role '{role}' is invalid. Allowed: {sorted(list(VALID_ROLES))}",
+            message=f"Role '{role}' is invalid. Allowed: {sorted(list(SELF_REGISTRABLE_ROLES))}",
             status_code=400,
         )
 
@@ -82,7 +89,13 @@ def register():
         business_name=business_name,
     )
 
-    token = f"causara_token_{uuid.uuid4().hex}"
+    token = create_access_token(
+        user_id=user_record["user_id"],
+        role=user_record["role"],
+        seller_id=user_record.get("seller_id"),
+        email=user_record["email"],
+        full_name=user_record["full_name"],
+    )
 
     return format_success_response(
         {
@@ -141,8 +154,8 @@ def login():
     if stored_hash.startswith(("scrypt:", "pbkdf2:")):
         password_valid = check_password_hash(stored_hash, password)
     elif stored_hash == "demo_argon2_hash":
-        # Seeded demo credentials allow any standard password or demo123
-        password_valid = password in {"demo123", "password", "causara", "demo", "secret"} or len(password) >= 4
+        # Seeded demo accounts accept only explicit demo passwords (never arbitrary strings)
+        password_valid = password in {"demo123", "demo"}
 
     if not password_valid:
         raise APIError(
@@ -151,12 +164,28 @@ def login():
             status_code=401,
         )
 
-    # If a specific role was requested for role-based login, verify or adopt
-    effective_role = user.get("role") or "USER"
-    if requested_role and requested_role in VALID_ROLES:
-        effective_role = requested_role
+    # Enforce authoritative database role; never allow client-supplied role escalation
+    effective_role = (user.get("role") or "").upper()
+    if not effective_role:
+        raise APIError(
+            code="FORBIDDEN",
+            message="User account does not have an assigned operational role.",
+            status_code=403,
+        )
+    if requested_role and requested_role != effective_role:
+        raise APIError(
+            code="ROLE_MISMATCH",
+            message=f"Account is not authorized for role '{requested_role}'.",
+            status_code=403,
+        )
 
-    token = f"causara_token_{uuid.uuid4().hex}"
+    token = create_access_token(
+        user_id=user["user_id"],
+        role=effective_role,
+        seller_id=user.get("seller_id"),
+        email=user["email"],
+        full_name=user["full_name"],
+    )
 
     return format_success_response(
         {
@@ -174,30 +203,19 @@ def login():
 
 
 @auth_bp.route("/me", methods=["GET"])
+@require_auth()
 def get_current_user():
-    """Retrieve profile of the currently identified user."""
-    user_id_param = request.args.get("user_id")
-    if not user_id_param:
-        raise APIError(code="BAD_REQUEST", message="user_id parameter is required.", status_code=400)
-
-    try:
-        user_id = int(user_id_param)
-    except ValueError:
-        raise APIError(code="BAD_REQUEST", message="user_id must be an integer.", status_code=400)
-
-    user = _user_repo.get_user_by_id(user_id)
-    if not user:
-        raise APIError(code="USER_NOT_FOUND", message=f"User {user_id} not found.", status_code=404)
-
+    """Retrieve profile of the currently authenticated user."""
+    principal = g.current_user
     return format_success_response(
         {
-            "user_id": user["user_id"],
-            "full_name": user["full_name"],
-            "email": user["email"],
-            "role": user.get("role"),
-            "seller_id": user.get("seller_id"),
-            "business_name": user.get("business_name"),
-            "is_active": bool(user["is_active"]),
+            "user_id": principal["user_id"],
+            "full_name": principal.get("full_name"),
+            "email": principal.get("email"),
+            "role": principal.get("role"),
+            "seller_id": principal.get("seller_id"),
+            "business_name": principal.get("business_name"),
+            "is_active": True,
         },
         status_code=200,
     )
