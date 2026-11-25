@@ -8,13 +8,6 @@ Causara is an explainable e-commerce order delay intelligence and intervention a
 
 ## Visual Tour
 
-### Operational Intelligence Dashboard
-Real-time fulfillment metrics, open investigation cases, and recent order activity connected to live database queries:
-
-![Causara Operational Dashboard](docs/assets/dashboard.jpg)
-
-### Order Stage Timeline & Duration Variances
-Visual stage progression with planned vs. actual duration calculations and chronological event logging:
 
 ![Causara Order Timeline](docs/assets/order-timeline.png)
 
